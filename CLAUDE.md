@@ -41,22 +41,71 @@ Main application entry point with:
 
 ## Development Commands
 
-### Local Development
+### VS Code Devcontainer Development (Recommended)
+
+The project includes a complete devcontainer setup for optimal development experience:
+
+**Quick Start:**
 ```bash
-cd azure-day2-engine-python
+# Open in VS Code and select "Reopen in Container"
+# All dependencies and tools are automatically configured
+
+# Start the application
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Features included in devcontainer:**
+- Python 3.11 with FastAPI development stack
+- Azure CLI pre-installed and configured
+- VS Code extensions: Python, Azure, Kubernetes, YAML
+- Debugging configurations for FastAPI
+- Auto-formatting with Black and import sorting with isort
+- Linting with Pylint and Flake8
+- Docker-in-docker support for container operations
+
+### Local Development (Alternative)
+
+**Using the development script:**
+```bash
+./run_dev.sh
+```
+
+**Manual setup:**
+```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Copy environment template
+cp .env.example .env
+# Edit .env with your Azure credentials
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Run the application
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Container Build and Run
 ```bash
+# Development container
+docker build -f .devcontainer/Dockerfile -t azure-day2-engine:dev .
+
+# Production container
 docker build -t azure-day2-engine:latest .
-docker run -p 8000:8000 azure-day2-engine:latest
+docker run -p 8000:8000 --env-file .env azure-day2-engine:latest
 ```
 
 ### Kubernetes Deployment
 ```bash
-kubectl apply -f kubernetes/deployment.yaml
+# Configure Azure credentials as environment variables
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_TENANT_ID="your-tenant-id" 
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+
+# Deploy with environment substitution
+envsubst < kubernetes/deployment.yaml | kubectl apply -f -
 ```
 
 ### Dependencies
@@ -65,6 +114,13 @@ kubectl apply -f kubernetes/deployment.yaml
 - Azure SDK libraries (azure-identity, azure-mgmt-*)
 - Azure CLI
 - PostgreSQL client (psycopg2)
+
+### Development Tools
+- **VS Code Devcontainer**: Complete development environment with pre-configured tools
+- **run_dev.sh**: Quick setup script for local development
+- **Debug Configurations**: Pre-configured launch.json for FastAPI debugging
+- **Code Quality Tools**: Black, isort, Pylint, Flake8 for code formatting and linting
+- **Azure Integration**: Azure CLI and Azure extensions for VS Code
 
 ## API Endpoints
 
@@ -83,10 +139,31 @@ kubectl apply -f kubernetes/deployment.yaml
 ## Adding New Operations
 
 1. Create new service class in `app/services/` following existing patterns
-2. Add new API routes in `app/api/v1/` with appropriate request/response models
+2. Add new API routes in `app/api/v1/` with appropriate request/response models  
 3. Register new router in `app/main.py`
 4. Update Pydantic models in `app/models/operations.py` if needed
 5. Add appropriate error handling and logging
+6. Test using the VS Code debugging configurations or development server
+
+## Testing and Debugging
+
+### Using VS Code Devcontainer
+- **FastAPI Debug**: Use the pre-configured debug launch configuration
+- **Breakpoint Debugging**: Set breakpoints in VS Code and debug interactively
+- **Hot Reload**: Development server automatically reloads on code changes
+- **Integrated Testing**: Run tests directly in the integrated terminal
+
+### API Testing
+- **Swagger UI**: http://localhost:8000/docs - Interactive API documentation  
+- **Health Check**: http://localhost:8000/health - Application health status
+- **ReDoc**: http://localhost:8000/redoc - Alternative API documentation
+
+### Development Workflow
+1. Open project in VS Code devcontainer
+2. Configure `.env` file with Azure credentials
+3. Start application with debug configuration or terminal
+4. Use Swagger UI for interactive API testing
+5. Set breakpoints and debug as needed
 
 ## Security Model
 

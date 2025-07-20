@@ -46,7 +46,7 @@ Create a modular, extensible platform to perform governed Azure operations (e.g.
 ## 📜 Project Structure
 
 ```bash
-azure-day2-engine-python/
+azure-day2-engine/
 ├── app/
 │   ├── api/v1/                 # API routes
 │   │   ├── aks.py             # AKS operations (/AKS/v1/*)
@@ -61,31 +61,140 @@ azure-day2-engine-python/
 │   │   └── operations.py      # Request/response models
 │   ├── scripts/sql/            # SQL scripts for execution
 │   └── main.py                # FastAPI application
+├── .devcontainer/              # VS Code devcontainer config
+│   ├── devcontainer.json      # Devcontainer configuration
+│   └── Dockerfile             # Development container
+├── .vscode/                    # VS Code settings
+│   ├── launch.json            # Debug configurations
+│   └── settings.json          # Editor settings
 ├── kubernetes/                 # Kubernetes manifests
 │   └── deployment.yaml        # Complete AKS deployment config
 ├── tests/                     # Test files
-├── Dockerfile                 # Container configuration
+├── Dockerfile                 # Production container configuration
 ├── requirements.txt           # Python dependencies
-└── README.md                  # Detailed documentation
+├── .env.example               # Environment variables template
+└── README.md                  # Project documentation
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-### Local Development
-```bash
-cd azure-day2-engine-python
-pip install -r requirements.txt
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+### 🐳 VS Code Devcontainer (Recommended)
 
-### Kubernetes Deployment
+The fastest way to get started is using the pre-configured devcontainer:
+
+1. **Prerequisites**:
+   - Install [VS Code](https://code.visualstudio.com/)
+   - Install [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+   - Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+2. **Open in devcontainer**:
+   ```bash
+   git clone <your-repo>
+   cd azure-day2-engine
+   code .
+   ```
+   - Click "Reopen in Container" when prompted
+   - Wait for container to build (includes Python, Azure CLI, and all extensions)
+
+3. **Configure Azure credentials**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Azure credentials
+   ```
+
+4. **Start the application**:
+   ```bash
+   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+5. **Access the application**:
+   - **API Documentation**: http://localhost:8000/docs
+   - **Health Check**: http://localhost:8000/health
+
+### 🖥️ Local Development (Alternative)
+
+If you prefer local development without containers:
+
+1. **Quick start script**:
+   ```bash
+   ./run_dev.sh
+   ```
+
+2. **Manual setup**:
+   ```bash
+   # Create virtual environment
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   
+   # Install dependencies
+   pip install -r requirements.txt
+   
+   # Configure environment
+   cp .env.example .env
+   # Edit .env with your Azure credentials
+   
+   # Run application
+   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+### 🐋 Container Development
+
+Build and run in a container:
+
 ```bash
+# Build the image
 docker build -t azure-day2-engine:latest .
-kubectl apply -f kubernetes/deployment.yaml
+
+# Run with environment file
+docker run -p 8000:8000 --env-file .env azure-day2-engine:latest
 ```
 
-### API Documentation
-- **Swagger UI**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
+### ☸️ Kubernetes Deployment
+
+Deploy to Azure Kubernetes Service:
+
+```bash
+# Build and tag for your registry
+docker build -t your-registry/azure-day2-engine:latest .
+docker push your-registry/azure-day2-engine:latest
+
+# Configure Azure credentials
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_TENANT_ID="your-tenant-id"
+export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+
+# Create base64 encoded secrets
+export AZURE_CLIENT_ID_B64=$(echo -n $AZURE_CLIENT_ID | base64)
+export AZURE_TENANT_ID_B64=$(echo -n $AZURE_TENANT_ID | base64)
+export AZURE_SUBSCRIPTION_ID_B64=$(echo -n $AZURE_SUBSCRIPTION_ID | base64)
+
+# Deploy to Kubernetes
+envsubst < kubernetes/deployment.yaml | kubectl apply -f -
+```
+
+## 🔧 Development Tools
+
+### VS Code Features (in devcontainer)
+- **Python IntelliSense** with type checking
+- **Auto-formatting** with Black
+- **Import sorting** with isort
+- **Linting** with Pylint and Flake8
+- **Debugging** with pre-configured launch configurations
+- **Azure CLI** integration
+- **Kubernetes** tools and YAML support
+
+### Available Scripts
+- `./run_dev.sh` - Quick development environment setup
+- **Debug configurations** in VS Code for FastAPI debugging
+- **Integrated terminal** with all tools pre-installed
+
+## 🌐 API Access
+
+Once running, access these endpoints:
+
+- **📚 API Documentation (Swagger)**: http://localhost:8000/docs
+- **🔍 Alternative API Docs (ReDoc)**: http://localhost:8000/redoc
+- **❤️ Health Check**: http://localhost:8000/health
+- **📊 OpenAPI Schema**: http://localhost:8000/openapi.json
