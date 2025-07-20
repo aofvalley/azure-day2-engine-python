@@ -1,9 +1,9 @@
 
-# 🧾 Azure Day 2 Engine
+# 🧾 Azure Day 2 Engine - Python Edition
 
 ## 🎯 Purpose
 
-Create a modular, extensible platform to perform governed Azure operations (e.g. starting/stopping clusters, upgrade/backup databases, etc...) exposed securely and interactively through Azure API Management also adding AI capabilities with the new **MCP server preview**. This enables rich, role-aware service automation and seamless integration with IDPs, Generative AI agents and third party components.
+Create a modular, extensible platform to perform governed Azure operations (e.g. starting/stopping clusters, upgrade/backup databases, etc...) using **FastAPI** and **Python**, deployed as a microservice in Azure Kubernetes Service (AKS). The system enables rich, role-aware service automation with Azure Managed Identity integration and seamless integration with IDPs, Generative AI agents and third party components.
 
 ---
 
@@ -11,54 +11,81 @@ Create a modular, extensible platform to perform governed Azure operations (e.g.
 
 | Layer | Components |
 |-------|------------|
-| **API Runtime** | Azure Functions (.NET Isolated) per service |
-| **Operations** | Implemented via `IResourceOperation` |
-| **Discovery & Metadata** | Swagger (`/swagger.json`) generated dynamically |
-| **Security** | RBAC enforcement via Azure AD claims |
-| **API Gateway** | Azure API Management, exposing the APIs | 
-| **MCP Gateway** | Azure API Management MCP server, exposing the APIs as MCP tools |
+| **API Runtime** | FastAPI with Python 3.11 |
+| **Operations** | Service-based operations for AKS and PostgreSQL |
+| **Authentication** | Azure Managed Identity + Service Principal |
+| **Container Runtime** | Docker container deployed in AKS |
+| **Database Integration** | Direct PostgreSQL connection + SQL script execution |
+| **Azure Integration** | Azure SDK + Azure CLI command execution |
 
 ---
 
 ## 🔌 Key Capabilities
 
-- ✅ **Custom Azure resource management and operations** via standardized APIs
-- 🧩 **Pluggable operations** using DI in isolated Functions
-- 🔐 **RBAC-enforced** via Azure AD roles like `AKS-Operator`, `PostgreSQL-Operator`
-- 📜 **Governance** APp Insights for audit, metrics and APIM policies for throttling
-- 📘 **OpenAPI generation** easy API discovery
-- 🛠️ **API Gateway** using APIM's configuration
-- 🛠️ **Preview MCP support** using APIM's configuration
+- ✅ **FastAPI-based REST API** with automatic OpenAPI documentation
+- 🐳 **Containerized deployment** ready for AKS with health checks
+- 🔐 **Azure Managed Identity** authentication for secure resource access
+- 🔄 **AKS Operations**: Start/stop clusters, status monitoring
+- 🐘 **PostgreSQL Operations**: Major upgrades, custom SQL script execution
+- 🖥️ **Azure CLI Integration** for advanced operations
+- 📊 **Structured Logging** with audit trails and monitoring
+- 🔧 **Dynamic Configuration** for multiple environments
 
 ---
 
 ## 🧠 Why This Matters
 
-- 🛡️ Governance is enforced
-- 🧰 Developers use standard tooling to automate tasks
-- 🔌 Easily extensible to other Azure Services.
-- 🧠 AI agents can discover and invoke operations semantically
+- 🛡️ **Secure by Design**: Uses Azure Managed Identity, no hardcoded credentials
+- 🐍 **Python Ecosystem**: Leverages rich Python libraries and Azure SDK
+- 🚀 **Cloud Native**: Designed for Kubernetes with proper health checks
+- 🔌 **Extensible**: Easy to add new Azure services and operations
+- 🧠 **AI Ready**: RESTful APIs perfect for AI agent integration
 
 ---
 
-## 📜 Project Tree
+## 📜 Project Structure
 
-``` bash
-AzureDay2Engine/
-├── Program.cs
-├── GlobalUsings.css
-├── Interfaces/
-│   └── IResourceOperation.cs
-├── Operations/
-│   └── StartAksClusterOperation.cs
-├── Decorators/
-│   ├── AuditDecorator.cs
-│   ├── ThrottleDecorator.cs
-│   └── MetricsDecorator.cs
-├── Services/
-│   ├── OperationRegistry.cs
-│   └── SwaggerGenerator.cs
-├── Functions/
-│   ├── ExecuteOperation.cs
-│   └── SwaggerEndpoint.cs
+```bash
+azure-day2-engine-python/
+├── app/
+│   ├── api/v1/                 # API routes
+│   │   ├── aks.py             # AKS operations (/AKS/v1/*)
+│   │   └── pssql.py           # PostgreSQL operations (/PSSQL/v1/*)
+│   ├── core/                   # Core functionality
+│   │   ├── config.py          # Configuration management
+│   │   └── azure_auth.py      # Azure authentication
+│   ├── services/               # Business logic
+│   │   ├── aks_service.py     # AKS operations service
+│   │   └── postgresql_service.py # PostgreSQL operations service
+│   ├── models/                 # Pydantic models
+│   │   └── operations.py      # Request/response models
+│   ├── scripts/sql/            # SQL scripts for execution
+│   └── main.py                # FastAPI application
+├── kubernetes/                 # Kubernetes manifests
+│   └── deployment.yaml        # Complete AKS deployment config
+├── tests/                     # Test files
+├── Dockerfile                 # Container configuration
+├── requirements.txt           # Python dependencies
+└── README.md                  # Detailed documentation
 ```
+
+---
+
+## 🚀 Quick Start
+
+### Local Development
+```bash
+cd azure-day2-engine-python
+pip install -r requirements.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Kubernetes Deployment
+```bash
+docker build -t azure-day2-engine:latest .
+kubectl apply -f kubernetes/deployment.yaml
+```
+
+### API Documentation
+- **Swagger UI**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health

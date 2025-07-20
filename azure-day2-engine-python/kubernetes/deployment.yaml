@@ -1,0 +1,208 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-day2-engine
+  namespace: default
+  labels:
+    app: azure-day2-engine
+    version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: azure-day2-engine
+  template:
+    metadata:
+      labels:
+        app: azure-day2-engine
+        version: "1.0.0"
+    spec:
+      serviceAccountName: azure-day2-engine
+      containers:
+      - name: azure-day2-engine
+        image: azure-day2-engine:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: AZURE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: client-id
+        - name: AZURE_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: tenant-id
+        - name: AZURE_SUBSCRIPTION_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: subscription-id
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: sql-scripts
+          mountPath: /app/app/scripts/sql
+          readOnly: true
+      volumes:
+      - name: sql-scripts
+        configMap:
+          name: sql-scripts-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-day2-engine-service
+  namespace: default
+  labels:
+    app: azure-day2-engine
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: azure-day2-engine
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: azure-day2-engine
+  namespace: default
+  annotations:
+    azure.workload.identity/client-id: "${AZURE_CLIENT_ID}"
+  labels:
+    azure.workload.identity/use: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-credentials
+  namespace: default
+type: Opaque
+data:
+  # Base64 encoded values - replace with actual values
+  client-id: "${AZURE_CLIENT_ID_B64}"
+  tenant-id: "${AZURE_TENANT_ID_B64}"
+  subscription-id: "${AZURE_SUBSCRIPTION_ID_B64}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sql-scripts-config
+  namespace: default
+data:
+  sample_health_check.sql: |
+    -- Sample health check script for PostgreSQL
+    -- This script performs basic health checks on the database
+    
+    -- Check database version and current time
+    SELECT 
+        version() as postgresql_version,
+        current_timestamp as current_time,
+        current_database() as database_name;
+    
+    -- Check database size
+    SELECT 
+        pg_database.datname as database_name,
+        pg_size_pretty(pg_database_size(pg_database.datname)) as size
+    FROM pg_database
+    WHERE pg_database.datname = current_database();
+    
+    -- Check active connections
+    SELECT 
+        count(*) as active_connections,
+        max(max_conn.setting::int) as max_connections,
+        round((count(*)::decimal / max(max_conn.setting::int)) * 100, 2) as connection_usage_percent
+    FROM pg_stat_activity 
+    CROSS JOIN pg_settings max_conn 
+    WHERE max_conn.name = 'max_connections'
+      AND pg_stat_activity.state = 'active';
+    
+    -- Check table count in current database
+    SELECT 
+        schemaname,
+        count(*) as table_count
+    FROM pg_tables 
+    WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+    GROUP BY schemaname
+    ORDER BY table_count DESC;
+  
+  sample_backup_check.sql: |
+    -- Sample backup verification script for PostgreSQL
+    -- This script checks backup-related information and settings
+    
+    -- Check current backup settings and last backup information
+    SELECT 
+        name,
+        setting,
+        unit,
+        short_desc
+    FROM pg_settings 
+    WHERE name IN (
+        'archive_mode',
+        'archive_command',
+        'wal_level',
+        'max_wal_senders',
+        'wal_keep_segments'
+    )
+    ORDER BY name;
+    
+    -- Check WAL files information
+    SELECT 
+        count(*) as wal_files_count,
+        pg_size_pretty(sum(size)) as total_wal_size
+    FROM pg_ls_waldir();
+    
+    -- Check replication slots if any
+    SELECT 
+        slot_name,
+        slot_type,
+        database,
+        active,
+        restart_lsn,
+        confirmed_flush_lsn
+    FROM pg_replication_slots;
+    
+    -- Database statistics for backup planning
+    SELECT 
+        schemaname,
+        tablename,
+        n_tup_ins as inserts,
+        n_tup_upd as updates,
+        n_tup_del as deletes,
+        n_live_tup as live_tuples,
+        n_dead_tup as dead_tuples,
+        last_vacuum,
+        last_autovacuum,
+        last_analyze,
+        last_autoanalyze
+    FROM pg_stat_user_tables
+    ORDER BY n_live_tup DESC
+    LIMIT 10;
