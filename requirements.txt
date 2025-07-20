@@ -12,3 +12,4 @@ aiofiles==23.2.1
 python-dotenv>=1.0.1,<2.0.0
 structlog==23.2.0
 eval-type-backport>=0.2.0
+aiohttp>=3.8.0
