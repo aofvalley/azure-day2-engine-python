@@ -4,7 +4,9 @@ import structlog
 from app.services.aks_service import AKSService
 from app.models.operations import (
     AKSClusterRequest, 
-    AKSClusterResponse, 
+    AKSClusterResponse,
+    CLICommandRequest,
+    CLICommandResponse,
     OperationResult,
     OperationStatus
 )
@@ -118,36 +120,30 @@ async def get_cluster_status(resource_group: str, cluster_name: str):
         logger.error(f"Error getting status for AKS cluster {cluster_name}", error=str(e))
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.post("/cli")
-async def execute_cli_command(command: dict):
+@router.post("/cli", response_model=CLICommandResponse)
+async def execute_cli_command(request: CLICommandRequest):
     """Execute Azure CLI command for AKS operations"""
     try:
-        cmd = command.get("command", "")
-        if not cmd:
-            raise HTTPException(status_code=400, detail="Command is required")
-        
-        logger.info(f"Received request to execute Azure CLI command: {cmd}")
+        logger.info(f"Received request to execute Azure CLI command: {request.command}")
         
         aks_service = get_aks_service()
-        result = await aks_service.execute_cli_command(cmd)
+        result = await aks_service.execute_cli_command(request.command)
+        
+        response = CLICommandResponse(
+            operation="cli_command",
+            command=request.command,
+            result=result
+        )
         
         if result.status == OperationStatus.SUCCESS:
             return JSONResponse(
                 status_code=200,
-                content={
-                    "operation": "cli_command",
-                    "command": cmd,
-                    "result": result.dict()
-                }
+                content=response.dict()
             )
         else:
             return JSONResponse(
                 status_code=500,
-                content={
-                    "operation": "cli_command",
-                    "command": cmd,
-                    "result": result.dict()
-                }
+                content=response.dict()
             )
             
     except Exception as e:

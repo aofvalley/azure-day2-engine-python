@@ -52,3 +52,11 @@ class ScriptExecutionResponse(BaseModel):
     script_name: str
     result: OperationResult
     query_results: Optional[List[Dict[str, Any]]] = None
+
+class CLICommandRequest(BaseModel):
+    command: str = Field(..., description="Azure CLI command to execute", example="az postgres flexible-server list -g myresourcegroup")
+
+class CLICommandResponse(BaseModel):
+    operation: str
+    command: str
+    result: OperationResult
