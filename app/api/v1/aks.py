@@ -11,7 +11,10 @@ from app.models.operations import (
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
-aks_service = AKSService()
+
+def get_aks_service():
+    """Get AKS service instance with lazy loading"""
+    return AKSService()
 
 @router.post("/start", response_model=AKSClusterResponse)
 async def start_cluster(request: AKSClusterRequest):
@@ -19,6 +22,7 @@ async def start_cluster(request: AKSClusterRequest):
     try:
         logger.info(f"Received request to start AKS cluster: {request.cluster_name}")
         
+        aks_service = get_aks_service()
         result = await aks_service.start_cluster(
             resource_group=request.resource_group,
             cluster_name=request.cluster_name
@@ -52,6 +56,7 @@ async def stop_cluster(request: AKSClusterRequest):
     try:
         logger.info(f"Received request to stop AKS cluster: {request.cluster_name}")
         
+        aks_service = get_aks_service()
         result = await aks_service.stop_cluster(
             resource_group=request.resource_group,
             cluster_name=request.cluster_name
@@ -85,6 +90,7 @@ async def get_cluster_status(resource_group: str, cluster_name: str):
     try:
         logger.info(f"Received request to get status for AKS cluster: {cluster_name}")
         
+        aks_service = get_aks_service()
         result = await aks_service.get_cluster_status(
             resource_group=resource_group,
             cluster_name=cluster_name
@@ -122,6 +128,7 @@ async def execute_cli_command(command: dict):
         
         logger.info(f"Received request to execute Azure CLI command: {cmd}")
         
+        aks_service = get_aks_service()
         result = await aks_service.execute_cli_command(cmd)
         
         if result.status == OperationStatus.SUCCESS:

@@ -13,7 +13,10 @@ from app.models.operations import (
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
-postgresql_service = PostgreSQLService()
+
+def get_postgresql_service():
+    """Get PostgreSQL service instance with lazy loading"""
+    return PostgreSQLService()
 
 @router.post("/upgrade", response_model=PostgreSQLResponse)
 async def major_upgrade(request: PostgreSQLMajorUpgradeRequest):
@@ -21,6 +24,7 @@ async def major_upgrade(request: PostgreSQLMajorUpgradeRequest):
     try:
         logger.info(f"Received request to upgrade PostgreSQL server: {request.server_name} to version {request.target_version}")
         
+        postgresql_service = get_postgresql_service()
         result = await postgresql_service.major_upgrade(
             resource_group=request.resource_group,
             server_name=request.server_name,
@@ -55,6 +59,7 @@ async def get_server_status(resource_group: str, server_name: str):
     try:
         logger.info(f"Received request to get status for PostgreSQL server: {server_name}")
         
+        postgresql_service = get_postgresql_service()
         result = await postgresql_service.get_server_status(
             resource_group=resource_group,
             server_name=server_name
@@ -88,6 +93,7 @@ async def execute_custom_script(request: PostgreSQLCustomScriptRequest):
     try:
         logger.info(f"Received request to execute script {request.script_name} on database {request.database_name}")
         
+        postgresql_service = get_postgresql_service()
         result = await postgresql_service.execute_custom_script(
             server_name=request.server_name,
             database_name=request.database_name,
@@ -131,6 +137,7 @@ async def execute_cli_command(command: dict):
         
         logger.info(f"Received request to execute Azure CLI command: {cmd}")
         
+        postgresql_service = get_postgresql_service()
         result = await postgresql_service.execute_cli_command(cmd)
         
         if result.status == OperationStatus.SUCCESS:

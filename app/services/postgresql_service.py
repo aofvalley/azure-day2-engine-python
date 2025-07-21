@@ -5,12 +5,28 @@ import psycopg2
 import aiohttp
 import json
 from typing import Dict, Any, List, Optional
+from datetime import datetime, date, time as dt_time
+from decimal import Decimal
 import structlog
 from app.core.azure_auth import azure_auth
 from app.models.operations import OperationResult, OperationStatus
 from app.core.config import settings
 
 logger = structlog.get_logger(__name__)
+
+def serialize_value(value):
+    """Convert PostgreSQL types to JSON-serializable types"""
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    elif isinstance(value, dt_time):
+        return value.isoformat()
+    elif isinstance(value, Decimal):
+        return float(value)
+    elif hasattr(value, '__dict__'):
+        # Handle other complex objects by converting to string
+        return str(value)
+    else:
+        return value
 
 class PostgreSQLService:
     def __init__(self):
@@ -161,20 +177,47 @@ class PostgreSQLService:
                     sql_script = sql_script.replace(f"${{{key}}}", str(value))
             
             # Connect to PostgreSQL database
-            connection_string = f"host={server_name}.postgres.database.azure.com port={settings.postgres_default_port} dbname={database_name} user={username} password={password} sslmode={settings.postgres_ssl_mode}"
+            # Handle both short name (advpsqlfxuk) and FQDN (advpsqlfxuk.postgres.database.azure.com)
+            if server_name.endswith('.postgres.database.azure.com'):
+                host = server_name
+            else:
+                host = f"{server_name}.postgres.database.azure.com"
+            
+            connection_string = f"host={host} port={settings.postgres_default_port} dbname={database_name} user={username} password={password} sslmode={settings.postgres_ssl_mode}"
             
             conn = psycopg2.connect(connection_string)
             cursor = conn.cursor()
             
-            # Execute script
-            cursor.execute(sql_script)
+            # Execute script and capture all results
+            query_results = []
             
-            # Fetch results if it's a SELECT query
-            query_results = None
-            if sql_script.strip().upper().startswith('SELECT'):
-                rows = cursor.fetchall()
-                columns = [desc[0] for desc in cursor.description]
-                query_results = [dict(zip(columns, row)) for row in rows]
+            # Split script into individual statements (simple approach)
+            statements = [stmt.strip() for stmt in sql_script.split(';') if stmt.strip()]
+            
+            for i, statement in enumerate(statements):
+                cursor.execute(statement)
+                
+                # Check if this statement returns results (SELECT, SHOW, etc.)
+                if cursor.description:
+                    rows = cursor.fetchall()
+                    columns = [desc[0] for desc in cursor.description]
+                    # Serialize each row to handle datetime and other non-JSON types
+                    statement_results = []
+                    for row in rows:
+                        serialized_row = {col: serialize_value(val) for col, val in zip(columns, row)}
+                        statement_results.append(serialized_row)
+                    
+                    query_results.append({
+                        "query_number": i + 1,
+                        "statement": statement[:100] + "..." if len(statement) > 100 else statement,
+                        "columns": columns,
+                        "rows": statement_results,
+                        "row_count": len(statement_results)
+                    })
+            
+            # If no results were captured, set to None for backward compatibility
+            if not query_results:
+                query_results = None
             
             conn.commit()
             cursor.close()
@@ -190,7 +233,8 @@ class PostgreSQLService:
                     "script_name": script_name,
                     "database": database_name,
                     "server": server_name,
-                    "rows_affected": cursor.rowcount if not query_results else len(query_results),
+                    "statements_executed": len(statements),
+                    "queries_with_results": len(query_results) if query_results else 0,
                     "query_results": query_results
                 },
                 execution_time=execution_time

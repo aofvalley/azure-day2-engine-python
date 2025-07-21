@@ -36,7 +36,6 @@ FROM pg_replication_slots;
 -- Database statistics for backup planning
 SELECT 
     schemaname,
-    tablename,
     n_tup_ins as inserts,
     n_tup_upd as updates,
     n_tup_del as deletes,
