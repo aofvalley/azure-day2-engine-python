@@ -17,11 +17,13 @@ Este directorio contiene scripts para validar la autenticación y acceso a recur
 
 ### 1. Prueba de autenticación AKS
 ```bash
+export PYTHONPATH=$(pwd)
 python test/aks/test_auth.py
 ```
 
 ### 2. Prueba de autenticación PostgreSQL
 ```bash
+export PYTHONPATH=$(pwd)
 python test/postgresql/test_auth.py
 ```
 

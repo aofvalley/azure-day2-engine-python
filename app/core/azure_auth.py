@@ -15,16 +15,10 @@ class AzureAuthManager:
         self._postgres_client: Optional[PostgreSQLManagementClient] = None
         
     def get_credential(self) -> DefaultAzureCredential:
-        """Get Azure credential using Managed Identity or default credential chain"""
+        """Get Azure credential using default credential chain (local/dev)"""
         if self._credential is None:
-            try:
-                # Try Managed Identity first (for AKS pod deployment)
-                self._credential = ManagedIdentityCredential()
-                logger.info("Using Managed Identity for Azure authentication")
-            except Exception:
-                # Fallback to default credential chain (for local development)
-                self._credential = DefaultAzureCredential()
-                logger.info("Using Default Azure Credential chain")
+            self._credential = DefaultAzureCredential()
+            logger.info("Using Default Azure Credential chain")
         return self._credential
     
     def get_aks_client(self) -> ContainerServiceClient:

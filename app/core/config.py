@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     azure_tenant_id: Optional[str] = os.getenv("AZURE_TENANT_ID")
     azure_client_id: Optional[str] = os.getenv("AZURE_CLIENT_ID")
     azure_subscription_id: Optional[str] = os.getenv("AZURE_SUBSCRIPTION_ID")
+    azure_client_secret: Optional[str] = os.getenv("AZURE_CLIENT_SECRET")
     
     # PostgreSQL Configuration
     postgres_default_port: int = 5432
