@@ -8,7 +8,7 @@
 
 ## 🎯 Purpose
 
-A modular, extensible platform to perform governed Azure operations (starting/stopping clusters, database upgrades/backups, etc.) using **FastAPI** and **Python**, deployed as a microservice in Azure Kubernetes Service (AKS). The system enables rich, role-aware service automation with Azure Managed Identity integration and seamless integration with IDPs, AI agents, and third-party components.
+POC - A modular, extensible platform to perform governed Azure operations (starting/stopping clusters, database upgrades/backups, etc.) using **FastAPI** and **Python**, deployed as a microservice in Azure Kubernetes Service (AKS). The system enables rich, role-aware service automation with Azure Managed Identity integration and seamless integration with IDPs, AI agents, and third-party components.
 
 **✨ Now featuring a professional Streamlit frontend for interactive demonstrations and client presentations!**
 
