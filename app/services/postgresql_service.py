@@ -14,6 +14,11 @@ logger = structlog.get_logger(__name__)
 
 class PostgreSQLService:
     def __init__(self):
+        if not azure_auth.get_credential() or not hasattr(azure_auth, 'get_postgres_client'):
+            raise RuntimeError("No Azure credential disponible o método get_postgres_client no encontrado.")
+        from app.core.config import settings
+        if not settings.azure_subscription_id:
+            raise ValueError("AZURE_SUBSCRIPTION_ID no está definido en el entorno.")
         self.client = azure_auth.get_postgres_client()
     
     async def major_upgrade(self, resource_group: str, server_name: str, target_version: str) -> OperationResult:
