@@ -16,9 +16,25 @@ fi
 echo "📦 Activating virtual environment..."
 source ../venv/bin/activate
 
+# Verify activation
+if [ "$VIRTUAL_ENV" = "" ]; then
+    echo "❌ Error: Failed to activate virtual environment"
+    exit 1
+fi
+
+echo "✅ Virtual environment activated: $VIRTUAL_ENV"
+
 # Install frontend dependencies
 echo "📥 Installing frontend dependencies..."
+pip install --upgrade pip
 pip install -r requirements.txt
+
+# Verify plotly installation
+echo "🔍 Verifying plotly installation..."
+python -c "import plotly; print(f'✅ Plotly {plotly.__version__} installed successfully')" || {
+    echo "⚠️ Installing plotly..."
+    pip install plotly>=5.15.0
+}
 
 # Check if backend is running
 echo "🔍 Checking if backend API is running..."
