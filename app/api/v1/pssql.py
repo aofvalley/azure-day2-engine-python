@@ -6,7 +6,9 @@ from app.models.operations import (
     PostgreSQLServerRequest,
     PostgreSQLMajorUpgradeRequest,
     PostgreSQLCustomScriptRequest,
+    PostgreSQLListServersRequest,
     PostgreSQLResponse,
+    PostgreSQLServerListResponse,
     ScriptExecutionResponse,
     CLICommandRequest,
     CLICommandResponse,
@@ -159,6 +161,104 @@ async def execute_cli_command(request: CLICommandRequest):
         logger.error(f"Error executing Azure CLI command", error=str(e))
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+@router.post("/servers/list", response_model=PostgreSQLServerListResponse)
+async def list_servers(request: PostgreSQLListServersRequest):
+    """List PostgreSQL Flexible Servers in subscription or resource group"""
+    try:
+        logger.info(f"Received request to list PostgreSQL servers in {'resource group ' + request.resource_group if request.resource_group else 'subscription'}")
+        
+        postgresql_service = get_postgresql_service()
+        result = await postgresql_service.list_servers(resource_group=request.resource_group)
+        
+        response = PostgreSQLServerListResponse(
+            operation="list_servers",
+            resource_group=request.resource_group,
+            result=result
+        )
+        
+        if result.status == OperationStatus.SUCCESS:
+            return JSONResponse(
+                status_code=200,
+                content=response.dict()
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content=response.dict()
+            )
+            
+    except Exception as e:
+        logger.error(f"Error listing PostgreSQL servers", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.post("/servers/start", response_model=PostgreSQLResponse)
+async def start_server(request: PostgreSQLServerRequest):
+    """Start PostgreSQL Flexible Server"""
+    try:
+        logger.info(f"Received request to start PostgreSQL server: {request.server_name}")
+        
+        postgresql_service = get_postgresql_service()
+        result = await postgresql_service.start_server(
+            resource_group=request.resource_group,
+            server_name=request.server_name
+        )
+        
+        response = PostgreSQLResponse(
+            operation="start_server",
+            server_name=request.server_name,
+            resource_group=request.resource_group,
+            result=result
+        )
+        
+        if result.status == OperationStatus.SUCCESS:
+            return JSONResponse(
+                status_code=200,
+                content=response.dict()
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content=response.dict()
+            )
+            
+    except Exception as e:
+        logger.error(f"Error starting PostgreSQL server {request.server_name}", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.post("/servers/stop", response_model=PostgreSQLResponse)
+async def stop_server(request: PostgreSQLServerRequest):
+    """Stop PostgreSQL Flexible Server"""
+    try:
+        logger.info(f"Received request to stop PostgreSQL server: {request.server_name}")
+        
+        postgresql_service = get_postgresql_service()
+        result = await postgresql_service.stop_server(
+            resource_group=request.resource_group,
+            server_name=request.server_name
+        )
+        
+        response = PostgreSQLResponse(
+            operation="stop_server",
+            server_name=request.server_name,
+            resource_group=request.resource_group,
+            result=result
+        )
+        
+        if result.status == OperationStatus.SUCCESS:
+            return JSONResponse(
+                status_code=200,
+                content=response.dict()
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content=response.dict()
+            )
+            
+    except Exception as e:
+        logger.error(f"Error stopping PostgreSQL server {request.server_name}", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 @router.get("/")
 async def list_postgresql_operations():
     """List available PostgreSQL operations"""
@@ -166,6 +266,24 @@ async def list_postgresql_operations():
         "service": "PostgreSQL Operations",
         "version": "v1",
         "available_operations": [
+            {
+                "endpoint": "/servers/list",
+                "method": "POST",
+                "description": "List PostgreSQL Flexible Servers",
+                "parameters": ["resource_group (optional)"]
+            },
+            {
+                "endpoint": "/servers/start",
+                "method": "POST",
+                "description": "Start PostgreSQL Flexible Server",
+                "parameters": ["resource_group", "server_name"]
+            },
+            {
+                "endpoint": "/servers/stop",
+                "method": "POST",
+                "description": "Stop PostgreSQL Flexible Server",
+                "parameters": ["resource_group", "server_name"]
+            },
             {
                 "endpoint": "/upgrade",
                 "method": "POST",

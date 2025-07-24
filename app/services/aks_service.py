@@ -24,20 +24,64 @@ class AKSService:
         self.client = azure_auth.get_aks_client()
     
     async def start_cluster(self, resource_group: str, cluster_name: str) -> OperationResult:
-        """Start an AKS cluster (operation not natively supported by SDK, placeholder)"""
+        """Start an AKS cluster using Azure CLI"""
         start_time = time.time()
         try:
             logger.info(f"Starting AKS cluster: {cluster_name} in {resource_group}")
-            cluster = self.client.managed_clusters.get(resource_group, cluster_name)
-            # El SDK actual no soporta power_state ni begin_start. Solo mostramos el estado actual.
+            
+            # Use Azure CLI to start the cluster
+            from app.core.azure_auth import azure_auth
+            cli_command = f"az aks start --name {cluster_name} --resource-group {resource_group}"
+            
+            logger.info(f"Executing CLI command: {cli_command}")
+            cli_result = await azure_auth.execute_azure_cli(cli_command)
+            
             execution_time = time.time() - start_time
-            logger.warning("La operación de inicio/parada de cluster AKS no está soportada por el SDK. Solo se muestra el estado actual.")
-            return OperationResult(
-                status=OperationStatus.SUCCESS,
-                message=f"Cluster {cluster_name} consultado. Estado actual: {getattr(cluster, 'provisioning_state', 'Desconocido')}",
-                details={"provisioning_state": getattr(cluster, 'provisioning_state', 'Desconocido')},
-                execution_time=execution_time
-            )
+            
+            if cli_result["success"]:
+                logger.info(f"AKS cluster {cluster_name} started successfully")
+                
+                # Get cluster status after starting
+                try:
+                    cluster = self.client.managed_clusters.get(resource_group, cluster_name) 
+                    power_state = getattr(cluster, 'power_state', None)
+                    power_state_code = getattr(power_state, 'code', 'Unknown') if power_state else 'Unknown'
+                    
+                    return OperationResult(
+                        status=OperationStatus.SUCCESS,
+                        message=f"Cluster {cluster_name} started successfully. Power state: {power_state_code}",
+                        details={
+                            "provisioning_state": getattr(cluster, 'provisioning_state', 'Unknown'),
+                            "power_state": power_state_code,
+                            "cli_output": cli_result.get("output", ""),
+                            "raw_output": cli_result.get("raw_output", "")
+                        },
+                        execution_time=execution_time
+                    )
+                except Exception as status_error:
+                    logger.warning(f"Could not get cluster status after start: {status_error}")
+                    return OperationResult(
+                        status=OperationStatus.SUCCESS,
+                        message=f"Cluster {cluster_name} start command executed successfully",
+                        details={
+                            "cli_output": cli_result.get("output", ""),
+                            "raw_output": cli_result.get("raw_output", "")
+                        },
+                        execution_time=execution_time
+                    )
+            else:
+                logger.error(f"Failed to start AKS cluster {cluster_name}: {cli_result.get('error', 'Unknown error')}")
+                return OperationResult(
+                    status=OperationStatus.FAILED,
+                    message=f"Failed to start cluster {cluster_name}: {cli_result.get('error', 'Unknown error')}",
+                    details={
+                        "cli_error": cli_result.get("error", ""), 
+                        "cli_output": cli_result.get("output", ""),
+                        "raw_output": cli_result.get("raw_output", "")
+                    },
+                    execution_time=execution_time
+                )
+                
         except Exception as e:
             execution_time = time.time() - start_time
             logger.error(f"Failed to start AKS cluster {cluster_name}", error=str(e))
@@ -48,20 +92,64 @@ class AKSService:
             )
     
     async def stop_cluster(self, resource_group: str, cluster_name: str) -> OperationResult:
-        """Stop an AKS cluster (operation not natively supported by SDK, placeholder)"""
+        """Stop an AKS cluster using Azure CLI"""
         start_time = time.time()
         try:
             logger.info(f"Stopping AKS cluster: {cluster_name} in {resource_group}")
-            cluster = self.client.managed_clusters.get(resource_group, cluster_name)
-            # El SDK actual no soporta power_state ni begin_stop. Solo mostramos el estado actual.
+            
+            # Use Azure CLI to stop the cluster
+            from app.core.azure_auth import azure_auth
+            cli_command = f"az aks stop --name {cluster_name} --resource-group {resource_group}"
+            
+            logger.info(f"Executing CLI command: {cli_command}")
+            cli_result = await azure_auth.execute_azure_cli(cli_command)
+            
             execution_time = time.time() - start_time
-            logger.warning("La operación de inicio/parada de cluster AKS no está soportada por el SDK. Solo se muestra el estado actual.")
-            return OperationResult(
-                status=OperationStatus.SUCCESS,
-                message=f"Cluster {cluster_name} consultado. Estado actual: {getattr(cluster, 'provisioning_state', 'Desconocido')}",
-                details={"provisioning_state": getattr(cluster, 'provisioning_state', 'Desconocido')},
-                execution_time=execution_time
-            )
+            
+            if cli_result["success"]:
+                logger.info(f"AKS cluster {cluster_name} stopped successfully")
+                
+                # Get cluster status after stopping
+                try:
+                    cluster = self.client.managed_clusters.get(resource_group, cluster_name) 
+                    power_state = getattr(cluster, 'power_state', None)
+                    power_state_code = getattr(power_state, 'code', 'Unknown') if power_state else 'Unknown'
+                    
+                    return OperationResult(
+                        status=OperationStatus.SUCCESS,
+                        message=f"Cluster {cluster_name} stopped successfully. Power state: {power_state_code}",
+                        details={
+                            "provisioning_state": getattr(cluster, 'provisioning_state', 'Unknown'),
+                            "power_state": power_state_code,
+                            "cli_output": cli_result.get("output", ""),
+                            "raw_output": cli_result.get("raw_output", "")
+                        },
+                        execution_time=execution_time
+                    )
+                except Exception as status_error:
+                    logger.warning(f"Could not get cluster status after stop: {status_error}")
+                    return OperationResult(
+                        status=OperationStatus.SUCCESS,
+                        message=f"Cluster {cluster_name} stop command executed successfully",
+                        details={
+                            "cli_output": cli_result.get("output", ""),
+                            "raw_output": cli_result.get("raw_output", "")
+                        },
+                        execution_time=execution_time
+                    )
+            else:
+                logger.error(f"Failed to stop AKS cluster {cluster_name}: {cli_result.get('error', 'Unknown error')}")
+                return OperationResult(
+                    status=OperationStatus.FAILED,
+                    message=f"Failed to stop cluster {cluster_name}: {cli_result.get('error', 'Unknown error')}",
+                    details={
+                        "cli_error": cli_result.get("error", ""), 
+                        "cli_output": cli_result.get("output", ""),
+                        "raw_output": cli_result.get("raw_output", "")
+                    },
+                    execution_time=execution_time
+                )
+                
         except Exception as e:
             execution_time = time.time() - start_time
             logger.error(f"Failed to stop AKS cluster {cluster_name}", error=str(e))

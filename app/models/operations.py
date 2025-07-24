@@ -39,6 +39,14 @@ class PostgreSQLCustomScriptRequest(PostgreSQLServerRequest):
     script_name: str = Field(..., description="SQL script filename")
     parameters: Optional[Dict[str, Any]] = Field(default=None, description="Script parameters")
 
+class PostgreSQLListServersRequest(BaseModel):
+    resource_group: Optional[str] = Field(default=None, description="Azure resource group name (optional - if not provided, lists all servers in subscription)")
+
+class PostgreSQLServerListResponse(BaseModel):
+    operation: str
+    resource_group: Optional[str]
+    result: OperationResult
+
 class PostgreSQLResponse(BaseModel):
     operation: str
     server_name: str

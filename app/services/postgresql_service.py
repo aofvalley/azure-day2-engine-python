@@ -249,6 +249,160 @@ class PostgreSQLService:
                 execution_time=execution_time
             )
     
+    async def list_servers(self, resource_group: Optional[str] = None) -> OperationResult:
+        """List PostgreSQL Flexible Servers in subscription or resource group"""
+        start_time = time.time()
+        try:
+            logger.info(f"Listing PostgreSQL servers in {'resource group ' + resource_group if resource_group else 'subscription'}")
+            
+            servers_list = []
+            
+            if resource_group:
+                # List servers in specific resource group
+                servers = self.client.servers.list_by_resource_group(resource_group)
+            else:
+                # List all servers in subscription
+                servers = self.client.servers.list()
+            
+            for server in servers:
+                server_info = {
+                    "name": server.name,
+                    "resource_group": server.id.split('/')[4] if server.id else "Unknown",
+                    "location": server.location,
+                    "state": server.state,
+                    "version": server.version,
+                    "sku": {
+                        "name": server.sku.name,
+                        "tier": server.sku.tier
+                    } if server.sku else None,
+                    "storage_size_gb": server.storage.storage_size_gb if server.storage else None,
+                    "fully_qualified_domain_name": server.fully_qualified_domain_name,
+                    "administrator_login": server.administrator_login,
+                    "availability_zone": server.availability_zone
+                }
+                servers_list.append(server_info)
+            
+            execution_time = time.time() - start_time
+            logger.info(f"Successfully listed {len(servers_list)} PostgreSQL servers")
+            
+            return OperationResult(
+                status=OperationStatus.SUCCESS,
+                message=f"Successfully listed {len(servers_list)} PostgreSQL servers",
+                details={
+                    "servers": servers_list,
+                    "total_count": len(servers_list),
+                    "resource_group": resource_group or "All resource groups"
+                },
+                execution_time=execution_time
+            )
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Failed to list PostgreSQL servers", error=str(e))
+            return OperationResult(
+                status=OperationStatus.FAILED,
+                message=f"Failed to list PostgreSQL servers: {str(e)}",
+                execution_time=execution_time
+            )
+    
+    async def start_server(self, resource_group: str, server_name: str) -> OperationResult:
+        """Start PostgreSQL Flexible Server"""
+        start_time = time.time()
+        try:
+            logger.info(f"Starting PostgreSQL server: {server_name} in {resource_group}")
+            
+            # Try REST API first, then fallback to Azure CLI
+            result = await self._start_stop_server_via_rest_api(resource_group, server_name, "start")
+            execution_time = time.time() - start_time
+            
+            if result["success"]:
+                logger.info(f"PostgreSQL server {server_name} start initiated successfully via REST API")
+                return OperationResult(
+                    status=OperationStatus.SUCCESS,
+                    message=f"Server {server_name} start operation initiated",
+                    details=result,
+                    execution_time=execution_time
+                )
+            else:
+                # Fallback to Azure CLI if REST API fails
+                logger.warning(f"REST API failed for starting server {server_name}, trying Azure CLI fallback")
+                cli_result = await self._start_stop_server_via_cli(resource_group, server_name, "start")
+                execution_time = time.time() - start_time
+                
+                if cli_result["success"]:
+                    logger.info(f"PostgreSQL server {server_name} started successfully via Azure CLI")
+                    return OperationResult(
+                        status=OperationStatus.SUCCESS,
+                        message=f"Server {server_name} started via Azure CLI",
+                        details={**result, "cli_fallback": cli_result},
+                        execution_time=execution_time
+                    )
+                else:
+                    return OperationResult(
+                        status=OperationStatus.FAILED,
+                        message=f"Failed to start server {server_name}: REST API: {result.get('error', 'Unknown')} | CLI: {cli_result.get('error', 'Unknown')}",
+                        details={"rest_api": result, "cli_fallback": cli_result},
+                        execution_time=execution_time
+                    )
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Failed to start PostgreSQL server {server_name}", error=str(e))
+            return OperationResult(
+                status=OperationStatus.FAILED,
+                message=f"Failed to start server {server_name}: {str(e)}",
+                execution_time=execution_time
+            )
+    
+    async def stop_server(self, resource_group: str, server_name: str) -> OperationResult:
+        """Stop PostgreSQL Flexible Server"""
+        start_time = time.time()
+        try:
+            logger.info(f"Stopping PostgreSQL server: {server_name} in {resource_group}")
+            
+            # Try REST API first, then fallback to Azure CLI
+            result = await self._start_stop_server_via_rest_api(resource_group, server_name, "stop")
+            execution_time = time.time() - start_time
+            
+            if result["success"]:
+                logger.info(f"PostgreSQL server {server_name} stop initiated successfully via REST API")
+                return OperationResult(
+                    status=OperationStatus.SUCCESS,
+                    message=f"Server {server_name} stop operation initiated",
+                    details=result,
+                    execution_time=execution_time
+                )
+            else:
+                # Fallback to Azure CLI if REST API fails
+                logger.warning(f"REST API failed for stopping server {server_name}, trying Azure CLI fallback")
+                cli_result = await self._start_stop_server_via_cli(resource_group, server_name, "stop")
+                execution_time = time.time() - start_time
+                
+                if cli_result["success"]:
+                    logger.info(f"PostgreSQL server {server_name} stopped successfully via Azure CLI")
+                    return OperationResult(
+                        status=OperationStatus.SUCCESS,
+                        message=f"Server {server_name} stopped via Azure CLI",
+                        details={**result, "cli_fallback": cli_result},
+                        execution_time=execution_time
+                    )
+                else:
+                    return OperationResult(
+                        status=OperationStatus.FAILED,
+                        message=f"Failed to stop server {server_name}: REST API: {result.get('error', 'Unknown')} | CLI: {cli_result.get('error', 'Unknown')}",
+                        details={"rest_api": result, "cli_fallback": cli_result},
+                        execution_time=execution_time
+                    )
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Failed to stop PostgreSQL server {server_name}", error=str(e))
+            return OperationResult(
+                status=OperationStatus.FAILED,
+                message=f"Failed to stop server {server_name}: {str(e)}",
+                execution_time=execution_time
+            )
+
     async def execute_cli_command(self, command: str) -> OperationResult:
         """Execute Azure CLI command for PostgreSQL operations"""
         start_time = time.time()
@@ -373,4 +527,113 @@ class PostgreSQLService:
             return {
                 "success": False,
                 "error": f"Exception during REST API call: {str(e)}"
+            }
+    
+    async def _start_stop_server_via_rest_api(self, resource_group: str, server_name: str, action: str) -> Dict[str, Any]:
+        """Start or stop server using Azure REST API"""
+        try:
+            credential = azure_auth.get_credential()
+            token = credential.get_token("https://management.azure.com/.default")
+            
+            # For PostgreSQL Flexible Server, start/stop operations use specific endpoints
+            url = f"https://management.azure.com/subscriptions/{settings.azure_subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.DBforPostgreSQL/flexibleServers/{server_name}/{action}"
+            
+            headers = {
+                "Authorization": f"Bearer {token.token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Use the correct API version for PostgreSQL Flexible Server operations
+            params = {
+                "api-version": "2023-12-01-preview"
+            }
+            
+            logger.info(f"Calling PostgreSQL {action} API: {url}")
+            logger.info(f"Headers: {headers}")
+            logger.info(f"Params: {params}")
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, params=params) as response:
+                    response_text = await response.text()
+                    
+                    logger.info(f"Response status: {response.status}")
+                    logger.info(f"Response text: {response_text}")
+                    logger.info(f"Response headers: {dict(response.headers)}")
+                    
+                    if response.status in [200, 202]:
+                        # 200 = synchronous success, 202 = async operation started
+                        if response.status == 202:
+                            # Extract operation location for tracking
+                            operation_location = response.headers.get("Location") or response.headers.get("Azure-AsyncOperation")
+                            return {
+                                "success": True,
+                                "status_code": response.status,
+                                "operation_id": operation_location,
+                                "server_state": "Starting" if action == "start" else "Stopping",
+                                "message": f"Server {action} operation initiated successfully"
+                            }
+                        else:
+                            # Synchronous completion
+                            result_data = json.loads(response_text) if response_text else {}
+                            return {
+                                "success": True,
+                                "status_code": response.status,
+                                "server_state": "Ready" if action == "start" else "Stopped",
+                                "message": f"Server {action} completed successfully"
+                            }
+                    else:
+                        logger.error(f"Server {action} API call failed: {response.status} - {response_text}")
+                        return {
+                            "success": False,
+                            "status_code": response.status,
+                            "error": f"API call failed with status {response.status}: {response_text}",
+                            "response_body": response_text
+                        }
+                        
+        except Exception as e:
+            logger.error(f"Error performing server {action} via REST API: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Exception during REST API call: {str(e)}"
+            }
+    
+    async def _start_stop_server_via_cli(self, resource_group: str, server_name: str, action: str) -> Dict[str, Any]:
+        """Start or stop server using Azure CLI as fallback"""
+        try:
+            # Build the appropriate Azure CLI command
+            if action == "start":
+                command = f"az postgres flexible-server start --resource-group {resource_group} --name {server_name}"
+            elif action == "stop":
+                command = f"az postgres flexible-server stop --resource-group {resource_group} --name {server_name}"
+            else:
+                return {
+                    "success": False,
+                    "error": f"Invalid action: {action}"
+                }
+            
+            logger.info(f"Executing Azure CLI command: {command}")
+            
+            # Execute the Azure CLI command
+            result = await azure_auth.execute_azure_cli(command)
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": f"Server {action} operation completed via Azure CLI",
+                    "cli_output": result.get("output", ""),
+                    "method": "azure_cli"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Azure CLI command failed: {result.get('error', 'Unknown error')}",
+                    "cli_output": result.get("output", ""),
+                    "method": "azure_cli"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error executing Azure CLI {action} command: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Exception during Azure CLI execution: {str(e)}"
             }
