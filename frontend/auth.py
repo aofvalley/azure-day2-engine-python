@@ -16,7 +16,7 @@ from typing import Optional, Dict, Any
 
 # Configuration
 AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
-AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "azure-day2-engine-2025")  # Default password
+AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "azure-day2-admin")  # Default password - matches backend
 API_BASE_URL = os.getenv("API_URL", "http://localhost:8000")
 
 def get_api_base_url() -> str:
@@ -38,24 +38,43 @@ def verify_credentials(username: str, password: str) -> bool:
 
 def login_user(username: str, password: str) -> Dict[str, Any]:
     """
-    Authenticate user with simple credential check
+    Authenticate user with the real API backend
     
     Returns:
         Dict with login response or error information
     """
-    if verify_credentials(username, password):
-        # Generate a demo token for the session
-        token = f"demo_token_{int(time.time())}_{username}"
-        return {
-            "success": True, 
-            "data": {
-                "access_token": token,
-                "user_info": {"username": username, "role": "admin"},
-                "expires_in": 7200  # 2 hours
+    try:
+        api_url = get_api_base_url()
+        response = requests.post(
+            f"{api_url}/auth/login", 
+            json={"username": username, "password": password},
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            return {
+                "success": True, 
+                "data": {
+                    "access_token": token_data.get("access_token"),
+                    "user_info": {"username": username, "role": "admin"},
+                    "expires_in": 7200  # 2 hours (backend default: 24h, but using shorter for frontend)
+                }
             }
-        }
-    else:
-        return {"success": False, "error": "Invalid credentials"}
+        elif response.status_code == 401:
+            return {"success": False, "error": "Invalid username or password"}
+        else:
+            return {"success": False, "error": f"Authentication failed: HTTP {response.status_code}"}
+            
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": "Cannot connect to authentication server. Please check if the backend API is running."}
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Authentication request timed out. Please try again."}
+    except requests.exceptions.RequestException as e:
+        return {"success": False, "error": f"Network error: {str(e)}"}
+    except Exception as e:
+        return {"success": False, "error": f"Unexpected error: {str(e)}"}
 
 def logout_user():
     """Logout user and clear session"""

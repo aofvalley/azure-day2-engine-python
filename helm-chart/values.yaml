@@ -18,7 +18,7 @@ global:
   auth:
     secretKey: "placeholder-secret-key"
     adminUsername: "admin"
-    adminPassword: "placeholder-password"
+    adminPassword: "azure-day2-admin"
     tokenExpireMinutes: 1440
 
 # Backend configuration
@@ -116,7 +116,7 @@ frontend:
   
   # Environment variables
   env:
-    API_URL: "http://azure-day2-engine-backend-service"  # Will be updated to external IP after deployment
+    API_URL: "http://azure-day2-engine-backend-service:80"  # Internal service communication with port
 
 # Service Account
 serviceAccount:

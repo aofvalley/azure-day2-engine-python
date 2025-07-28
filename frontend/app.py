@@ -262,10 +262,12 @@ class APIClient:
             
             # Handle authentication errors
             if response.status_code == 401:
-                st.error("🔒 Authentication failed. Please login again.")
-                # Clear authentication and force re-login
-                if "authenticated" in st.session_state:
-                    del st.session_state["authenticated"]
+                st.error("🔒 Authentication session expired. Please login again.")
+                # Clear all authentication data and force re-login
+                keys_to_clear = ["authenticated", "access_token", "user_info", "token_expires"]
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
                 st.rerun()
             
             return {
