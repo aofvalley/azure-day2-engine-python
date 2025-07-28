@@ -165,17 +165,8 @@ def show_login_form():
                 else:
                     st.error("Please enter both username and password")
         
-        # Information section
-        st.markdown("---")
-        st.markdown("### 📋 Default Credentials")
-        st.info(f"""
-            **Username:** {AUTH_USERNAME}  
-            **Password:** {AUTH_PASSWORD}
-            
-            ⚠️ **Security Note:** Configure via environment variables in production!
-        """)
-        
         # API connection status
+        st.markdown("---")
         st.markdown("### 🌐 Connection Status")
         api_url = get_api_base_url()
         
