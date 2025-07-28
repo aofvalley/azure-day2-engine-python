@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import pandas as pd
+from auth import require_authentication, make_authenticated_request, get_api_base_url
 
 # Try to import plotly, fallback gracefully if not available
 try:
@@ -241,9 +242,15 @@ class APIClient:
         self.base_url = base_url
         
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
-        """Make HTTP request to API"""
+        """Make HTTP request to API with authentication"""
         url = f"{self.base_url}{endpoint}"
         headers = {"Content-Type": "application/json"}
+        
+        # Add authentication headers if user is authenticated
+        if st.session_state.get("authenticated", False):
+            token = st.session_state.get("access_token")
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
         
         try:
             if method.upper() == "GET":
@@ -252,6 +259,14 @@ class APIClient:
                 response = requests.post(url, headers=headers, json=data)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
+            
+            # Handle authentication errors
+            if response.status_code == 401:
+                st.error("🔒 Authentication failed. Please login again.")
+                # Clear authentication and force re-login
+                if "authenticated" in st.session_state:
+                    del st.session_state["authenticated"]
+                st.rerun()
             
             return {
                 "success": response.status_code < 400,
@@ -624,11 +639,15 @@ def display_response(response: Dict[str, Any], title: str = "Operation Result"):
 def main():
     """Main IDP Application"""
     
+    # Require authentication before showing main app
+    require_authentication()
+    
     # Professional IDP Header
     st.markdown("""
     <div class="idp-header">
         <h1>🏗️ Azure Day 2 Engine</h1>
         <p>Internal Developer Platform | Operations Management & Automation</p>
+        <p><em>Secure Access ✓</em></p>
     </div>
     """, unsafe_allow_html=True)
     

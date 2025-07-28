@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 import structlog
 from app.services.aks_service import AKSService
@@ -10,6 +10,7 @@ from app.models.operations import (
     OperationResult,
     OperationStatus
 )
+from app.core.auth import get_current_user
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -19,10 +20,11 @@ def get_aks_service():
     return AKSService()
 
 @router.post("/start", response_model=AKSClusterResponse)
-async def start_cluster(request: AKSClusterRequest):
+async def start_cluster(request: AKSClusterRequest, current_user: dict = Depends(get_current_user)):
     """Start an AKS cluster"""
     try:
-        logger.info(f"Received request to start AKS cluster: {request.cluster_name}")
+        logger.info(f"Received request to start AKS cluster: {request.cluster_name}", 
+                   username=current_user.get("username"), operation="start_cluster")
         
         aks_service = get_aks_service()
         result = await aks_service.start_cluster(
@@ -53,7 +55,7 @@ async def start_cluster(request: AKSClusterRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/stop", response_model=AKSClusterResponse)
-async def stop_cluster(request: AKSClusterRequest):
+async def stop_cluster(request: AKSClusterRequest, current_user: dict = Depends(get_current_user)):
     """Stop an AKS cluster"""
     try:
         logger.info(f"Received request to stop AKS cluster: {request.cluster_name}")
@@ -87,7 +89,7 @@ async def stop_cluster(request: AKSClusterRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.get("/status/{resource_group}/{cluster_name}", response_model=AKSClusterResponse)
-async def get_cluster_status(resource_group: str, cluster_name: str):
+async def get_cluster_status(resource_group: str, cluster_name: str, current_user: dict = Depends(get_current_user)):
     """Get AKS cluster status"""
     try:
         logger.info(f"Received request to get status for AKS cluster: {cluster_name}")
@@ -121,7 +123,7 @@ async def get_cluster_status(resource_group: str, cluster_name: str):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/cli", response_model=CLICommandResponse)
-async def execute_cli_command(request: CLICommandRequest):
+async def execute_cli_command(request: CLICommandRequest, current_user: dict = Depends(get_current_user)):
     """Execute Azure CLI command for AKS operations"""
     try:
         logger.info(f"Received request to execute Azure CLI command: {request.command}")

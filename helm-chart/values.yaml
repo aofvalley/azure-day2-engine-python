@@ -13,6 +13,13 @@ global:
     tenantId: "placeholder-tenant-id"
     clientSecret: "placeholder-client-secret"
     subscriptionId: "placeholder-subscription-id"
+  
+  # Authentication configuration
+  auth:
+    secretKey: "placeholder-secret-key"
+    adminUsername: "admin"
+    adminPassword: "placeholder-password"
+    tokenExpireMinutes: 1440
 
 # Backend configuration
 backend:

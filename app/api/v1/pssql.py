@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 import structlog
 from app.services.postgresql_service import PostgreSQLService
@@ -14,6 +14,7 @@ from app.models.operations import (
     CLICommandResponse,
     OperationStatus
 )
+from app.core.auth import get_current_user
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()

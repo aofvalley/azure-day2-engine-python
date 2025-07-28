@@ -55,6 +55,24 @@ spec:
           value: {{ .Values.backend.env.LOG_LEVEL | quote }}
         - name: DEBUG
           value: {{ .Values.backend.env.DEBUG | quote }}
+        # Authentication environment variables
+        - name: AUTH_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: auth-secret-key
+        - name: ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: admin-username
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: admin-password
+        - name: ACCESS_TOKEN_EXPIRE_MINUTES
+          value: {{ .Values.global.auth.tokenExpireMinutes | quote }}
         resources:
           {{- toYaml .Values.backend.resources | nindent 10 }}
         livenessProbe:
