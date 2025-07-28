@@ -3,19 +3,9 @@
 # Azure Day 2 Engine - AKS Operations Helper (Helm)
 # =================================================
 
-# Configuration
-ACR_NAME="${ACR_NAME:-advaks}"
-AKS_CLUSTER="${AKS_CLUSTER:-adv_aks}"
-AKS_RESOURCE_GROUP="${AKS_RESOURCE_GROUP}"
-NAMESPACE="${NAMESPACE:-default}"
-HELM_RELEASE_NAME="${HELM_RELEASE_NAME:-azure-day2-engine}"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Load environment variables from .env file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/load-env.sh"
 
 # Function to print status
 print_status() {

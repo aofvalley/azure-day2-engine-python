@@ -5,58 +5,21 @@
 
 set -e
 
-# Configuration
-ACR_NAME="${ACR_NAME:-advaks}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
-AKS_CLUSTER="${AKS_CLUSTER:-adv_aks}"
-AKS_RESOURCE_GROUP="${AKS_RESOURCE_GROUP}"
-NAMESPACE="${NAMESPACE:-default}"
-HELM_RELEASE_NAME="${HELM_RELEASE_NAME:-azure-day2-engine}"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Load environment variables from .env file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/load-env.sh"
 
 echo -e "${BLUE}🚀 Azure Day 2 Engine - AKS Deployment (Helm)${NC}"
 echo "=============================================="
 
-# Function to print status
-print_status() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}❌ $1${NC}"
-}
-
 # Verify prerequisites
 echo -e "${BLUE}🔍 Verifying prerequisites...${NC}"
 
-# Check required environment variables
-if [ -z "$ACR_NAME" ]; then
-    print_error "ACR_NAME environment variable is not set"
-    echo "Please set ACR_NAME to your Azure Container Registry name"
+# Validate environment variables
+if ! validate_env; then
+    print_error "Environment validation failed"
+    echo "Please configure missing variables in .env file"
     exit 1
-fi
-
-if [ -z "$AKS_RESOURCE_GROUP" ]; then
-    print_error "AKS_RESOURCE_GROUP environment variable is not set"
-    echo "Please set AKS_RESOURCE_GROUP to your AKS resource group name"
-    exit 1
-fi
-
-# Check Azure credentials environment variables
-if [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_TENANT_ID" ] || [ -z "$AZURE_CLIENT_SECRET" ] || [ -z "$AZURE_SUBSCRIPTION_ID" ]; then
-    print_warning "Azure credential environment variables are not all set"
-    echo "Required variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID"
-    echo "You can set them now or the deployment will use placeholder values"
 fi
 
 # Check if kubectl is installed

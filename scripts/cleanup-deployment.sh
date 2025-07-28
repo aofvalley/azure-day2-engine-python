@@ -5,16 +5,9 @@
 
 set -e
 
-# Configuration
-NAMESPACE="${NAMESPACE:-default}"
-HELM_RELEASE_NAME="${HELM_RELEASE_NAME:-azure-day2-engine}"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Load environment variables from .env file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/load-env.sh"
 
 echo -e "${BLUE}🧹 Azure Day 2 Engine - Cleanup Deployment (Helm)${NC}"
 echo "=================================================="

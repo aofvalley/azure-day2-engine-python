@@ -5,17 +5,11 @@
 
 set -e
 
-# Configuration
-ACR_NAME="${ACR_NAME:-advaks}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
-PROJECT_NAME="azure-day2-engine"
+# Load environment variables from .env file
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/load-env.sh"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+PROJECT_NAME="azure-day2-engine"
 
 echo -e "${BLUE}🏗️  Azure Day 2 Engine - Docker Build and Push${NC}"
 echo "=================================================="

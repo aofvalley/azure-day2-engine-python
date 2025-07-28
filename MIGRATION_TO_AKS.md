@@ -42,24 +42,56 @@ sudo mv linux-amd64/helm /usr/local/bin/helm
 helm version
 ```
 
-### 3. Credenciales Azure
-Configurar las siguientes variables de entorno:
+### 3. Configuración de Variables de Entorno (Centralizada)
+
+El proyecto ahora utiliza un sistema centralizado de configuración mediante archivos `.env`:
+
+#### Opción 1: Configuración Interactiva (Recomendada)
 ```bash
-export AZURE_CLIENT_ID="your-client-id"
-export AZURE_TENANT_ID="your-tenant-id"
-export AZURE_CLIENT_SECRET="your-client-secret"
-export AZURE_SUBSCRIPTION_ID="your-subscription-id"
+# Ejecutar el asistente de configuración
+./scripts/setup-env.sh
 ```
 
-### 4. Configuración AKS y Helm
+Este script te guiará paso a paso para configurar todas las variables necesarias.
+
+#### Opción 2: Configuración Manual
 ```bash
-export ACR_NAME="advaks"                         # Nombre de tu ACR
-export AKS_CLUSTER="adv_aks"                    # Nombre de tu cluster AKS
-export AKS_RESOURCE_GROUP="your-rg-name"        # Resource group de AKS
-export IMAGE_TAG="latest"                        # Tag de las imágenes
-export NAMESPACE="default"                       # Kubernetes namespace
-export HELM_RELEASE_NAME="azure-day2-engine"    # Nombre del release de Helm
+# Copiar el template de configuración
+cp .env.example .env
+
+# Editar el archivo .env con tus valores reales
+nano .env  # o usa tu editor preferido
 ```
+
+**Variables requeridas en `.env`:**
+```bash
+# Azure Configuration
+AZURE_TENANT_ID=your-tenant-id-here
+AZURE_CLIENT_ID=your-client-id-here
+AZURE_CLIENT_SECRET=your-client-secret-here
+AZURE_SUBSCRIPTION_ID=your-subscription-id-here
+
+# AKS and Container Registry Configuration
+ACR_NAME=advaks
+AKS_CLUSTER=adv_aks
+AKS_RESOURCE_GROUP=your-resource-group-here
+IMAGE_TAG=latest
+NAMESPACE=default
+HELM_RELEASE_NAME=azure-day2-engine
+```
+
+#### Validación Automática
+```bash
+# Verificar configuración (opcional)
+source scripts/load-env.sh
+```
+
+**Ventajas del sistema centralizado:**
+- ✅ **Única fuente de verdad**: Todas las variables en un solo archivo
+- ✅ **Validación automática**: Los scripts verifican automáticamente las configuraciones
+- ✅ **Seguridad mejorada**: Las credenciales se muestran enmascaradas
+- ✅ **Sin exports manuales**: No necesitas configurar variables de entorno manualmente
+- ✅ **Consistencia**: Todos los scripts usan la misma configuración
 
 ## 🚀 Proceso de Migración
 
@@ -71,15 +103,20 @@ cd ~/Desarrollo/azure-day2-engine-python
 
 # 2. Verificar estructura del proyecto
 ls -la
-# Deberías ver: docker/, kubernetes/, helm-chart/, scripts/, app/, frontend/
+# Deberías ver: docker/, helm-chart/, scripts/, app/, frontend/
 
-# 3. Configurar variables de entorno
-export ACR_NAME="advaks"
-export AKS_CLUSTER="adv_aks"
-export AKS_RESOURCE_GROUP="tu-resource-group"
-export IMAGE_TAG="v1.0.0"
+# 3. Configurar variables de entorno (NUEVO - Sistema Centralizado)
+# Opción A: Configuración interactiva (recomendada)
+./scripts/setup-env.sh
 
-# 4. Verificar conectividad Azure
+# Opción B: Configuración manual
+cp .env.example .env
+# Editar .env con tus valores reales
+
+# 4. Verificar configuración automáticamente
+source scripts/load-env.sh
+
+# 5. Verificar conectividad Azure
 az account show
 az acr list --query "[].{Name:name,LoginServer:loginServer}" -o table
 ```
@@ -87,10 +124,12 @@ az acr list --query "[].{Name:name,LoginServer:loginServer}" -o table
 ### Paso 2: Construir y Subir Imágenes Docker
 
 ```bash
-# 1. Ejecutar el script de build y push
+# 1. Ejecutar el script de build y push (carga automáticamente .env)
 ./scripts/build-and-push.sh
 
-# El script ejecutará:
+# El script ejecutará automáticamente:
+# - Carga de variables desde .env
+# - Validación de configuración
 # - Verificación de prerequisitos
 # - Login a ACR
 # - Build de imagen backend
@@ -115,14 +154,15 @@ az acr list --query "[].{Name:name,LoginServer:loginServer}" -o table
 ### Paso 3: Desplegar a AKS con Helm
 
 ```bash
-# 1. Ejecutar el script de deployment con Helm
+# 1. Ejecutar el script de deployment con Helm (carga automáticamente .env)
 ./scripts/deploy-to-aks.sh
 
-# El script ejecutará:
+# El script ejecutará automáticamente:
+# - Carga y validación de variables desde .env
 # - Verificación de prerequisitos (kubectl, Helm, Azure CLI)
 # - Configuración de kubectl con AKS
 # - Creación/verificación del namespace
-# - Preparación de valores de Helm
+# - Preparación automática de valores de Helm
 # - Instalación/actualización del Helm chart
 # - Verificación de deployments
 ```
@@ -297,22 +337,57 @@ kubectl exec deployment/azure-day2-engine-frontend -- curl -I azure-day2-engine-
 
 #### 4. Problemas de Azure Credentials
 ```bash
-# Actualizar credenciales usando Helm upgrade
-helm upgrade azure-day2-engine ./helm-chart -n default \
+# Verificar configuración actual
+source scripts/load-env.sh
+
+# Actualizar credenciales en .env
+nano .env  # Editar las credenciales incorrectas
+
+# Aplicar cambios usando el script de operaciones (carga automáticamente .env)
+./scripts/aks-operations.sh update-secrets
+
+# Alternativamente, usar Helm directamente después de actualizar .env
+source scripts/load-env.sh
+helm upgrade azure-day2-engine ./helm-chart -n $NAMESPACE \
   --set global.azure.clientId=$AZURE_CLIENT_ID \
   --set global.azure.tenantId=$AZURE_TENANT_ID \
   --set global.azure.clientSecret=$AZURE_CLIENT_SECRET \
   --set global.azure.subscriptionId=$AZURE_SUBSCRIPTION_ID
-
-# O usar el script de operaciones
-export AZURE_CLIENT_ID="new-client-id"
-export AZURE_TENANT_ID="new-tenant-id" 
-export AZURE_CLIENT_SECRET="new-client-secret"
-export AZURE_SUBSCRIPTION_ID="new-subscription-id"
-./scripts/aks-operations.sh update-secrets
 ```
 
-#### 5. Problemas con Helm
+#### 5. Problemas de Configuración de Variables de Entorno
+```bash
+# Problema: Variables no configuradas o con valores por defecto
+# Síntomas: "Environment validation failed" al ejecutar scripts
+
+# Solución 1: Usar configuración interactiva
+./scripts/setup-env.sh
+
+# Solución 2: Verificar y corregir .env manualmente
+cat .env  # Ver configuración actual
+nano .env  # Editar valores incorrectos
+
+# Verificar configuración después de los cambios
+source scripts/load-env.sh
+
+# Problema: .env no existe
+# Síntomas: ".env file not found"
+
+# Solución: Crear desde template
+cp .env.example .env
+./scripts/setup-env.sh
+
+# Problema: Variables enmascaradas muestran valores incorrectos
+# Síntomas: Credenciales tienen longitud incorrecta
+
+# Verificar longitudes esperadas:
+# - AZURE_TENANT_ID: ~36 caracteres (UUID)
+# - AZURE_CLIENT_ID: ~36 caracteres (UUID) 
+# - AZURE_SUBSCRIPTION_ID: ~36 caracteres (UUID)
+# - AZURE_CLIENT_SECRET: variable (generalmente 40+ caracteres)
+```
+
+#### 6. Problemas con Helm
 ```bash
 # Ver releases de Helm
 helm list -n default
@@ -463,23 +538,49 @@ azure-day2-engine/ (Helm Release)
     └── ConfigMap (SQL scripts)
 ```
 
-## 🎉 ¡Migración Completada con Helm!
+## 🎉 ¡Migración Completada con Helm y Configuración Centralizada!
 
-Tu Azure Day 2 Engine ahora está ejecutándose en AKS con Helm:
-- ✅ Backend API optimizado (1 réplica configurable)
-- ✅ Frontend dashboard accesible externamente
-- ✅ Gestión simplificada con Helm Charts
-- ✅ Configuración versionada y reproducible
-- ✅ Actualizaciones y rollbacks sencillos
-- ✅ Servicios separados y escalables independientemente
-- ✅ Scripts de mantenimiento actualizados para Helm
-- ✅ Monitoreo y logging configurado
+Tu Azure Day 2 Engine ahora está ejecutándose en AKS con Helm y gestión moderna de configuración:
 
-**Ventajas de usar Helm:**
+### ✅ **Características Implementadas**
+- ✅ **Backend API optimizado** (1 réplica configurable)
+- ✅ **Frontend dashboard** accesible externamente
+- ✅ **Gestión simplificada** con Helm Charts
+- ✅ **Configuración centralizada** mediante archivos `.env`
+- ✅ **Validación automática** de variables de entorno
+- ✅ **Scripts inteligentes** con carga automática de configuración
+- ✅ **Seguridad mejorada** con enmascaramiento de credenciales
+- ✅ **Actualizaciones y rollbacks** sencillos
+- ✅ **Servicios separados** y escalables independientemente
+- ✅ **Monitoreo y logging** configurado
+
+### 🚀 **Ventajas del Nuevo Sistema**
+
+**Helm Benefits:**
 - Gestión de configuración centralizada
 - Versionado de deployments
 - Rollbacks automáticos
 - Plantillas reutilizables
 - Actualizaciones incrementales
+
+**Sistema de Variables de Entorno:**
+- 🎯 **Única fuente de verdad**: Archivo `.env` centralizado
+- 🔒 **Seguridad mejorada**: Credenciales enmascaradas en logs
+- ⚡ **Automatización completa**: Sin exports manuales necesarios
+- 🛡️ **Validación robusta**: Verificación automática de configuraciones
+- 📋 **Experiencia mejorada**: Scripts más intuitivos y fáciles de usar
+
+### 🔄 **Flujo de Trabajo Simplificado**
+```bash
+# 1. Configuración una sola vez
+./scripts/setup-env.sh
+
+# 2. Build y deploy sin configuración adicional
+./scripts/build-and-push.sh
+./scripts/deploy-to-aks.sh
+
+# 3. Operaciones sin exports manuales
+./scripts/aks-operations.sh status
+```
 
 El backend es el componente de valor con las APIs, mientras que el frontend sirve como herramienta de demostración y pruebas.
