@@ -229,7 +229,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Configuration
-API_BASE_URL = "http://localhost:8000"
+import os
+
+# API Configuration - use environment variable for Kubernetes deployment
+API_BASE_URL = os.getenv("API_URL", "http://localhost:8000")
 
 class APIClient:
     """Client for Azure Day 2 Engine API"""
