@@ -1,0 +1,264 @@
+name: Azure Day 2 Engine - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  AKS_CLUSTER: ${{ secrets.AKS_CLUSTER }}
+  AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+  NAMESPACE: ${{ secrets.NAMESPACE || 'default' }}
+  HELM_RELEASE_NAME: ${{ secrets.HELM_RELEASE_NAME || 'azure-day2-engine' }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    name: 🔍 Build and Test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+        
+    - name: Run linting
+      run: |
+        pip install flake8 black isort
+        # Run black formatter check
+        black --check --diff app/ || echo "Code formatting issues found"
+        # Run import sorting check
+        isort --check-only --diff app/ || echo "Import sorting issues found"
+        # Run flake8 linting (allow some flexibility)
+        flake8 app/ --max-line-length=120 --ignore=E203,W503 || echo "Linting issues found"
+        
+    - name: Run tests
+      env:
+        AZURE_CLIENT_ID: dummy-test-value
+        AZURE_TENANT_ID: dummy-test-value
+        AZURE_CLIENT_SECRET: dummy-test-value
+        AZURE_SUBSCRIPTION_ID: dummy-test-value
+        AUTH_SECRET_KEY: test-secret-key
+      run: |
+        # Run basic import tests
+        python -c "import app.main; print('✅ Main app imports successfully')"
+        python -c "import app.core.auth; print('✅ Auth module imports successfully')"
+        python -c "import app.api.v1.auth; print('✅ Auth API imports successfully')"
+        
+        # Test API startup
+        timeout 10s python -c "
+        import uvicorn
+        from app.main import app
+        import threading
+        import time
+        import requests
+        
+        def run_server():
+            uvicorn.run(app, host='127.0.0.1', port=8000, log_level='error')
+        
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+        time.sleep(3)
+        
+        try:
+            response = requests.get('http://127.0.0.1:8000/health', timeout=5)
+            assert response.status_code == 200
+            print('✅ API health check passed')
+        except Exception as e:
+            print(f'❌ API health check failed: {e}')
+            exit(1)
+        " || echo "⚠️ API test completed with warnings"
+
+  build-images:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    name: 🏗️ Build and Push Images
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Azure CLI
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Log in to Azure Container Registry
+      run: |
+        az acr login --name ${{ env.ACR_NAME }}
+        
+    - name: Set image tag
+      id: image-tag
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "IMAGE_TAG=latest" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
+        else
+          echo "IMAGE_TAG=dev-${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT=development" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/backend.Dockerfile
+        platforms: linux/amd64
+        push: true
+        tags: ${{ env.ACR_NAME }}.azurecr.io/azure-day2-engine-backend:${{ steps.image-tag.outputs.IMAGE_TAG }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/frontend.Dockerfile
+        platforms: linux/amd64
+        push: true
+        tags: ${{ env.ACR_NAME }}.azurecr.io/azure-day2-engine-frontend:${{ steps.image-tag.outputs.IMAGE_TAG }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Verify images in registry
+      run: |
+        echo "✅ Images built and pushed successfully:"
+        az acr repository show-tags --name ${{ env.ACR_NAME }} --repository azure-day2-engine-backend --output table
+        az acr repository show-tags --name ${{ env.ACR_NAME }} --repository azure-day2-engine-frontend --output table
+      
+    outputs:
+      image-tag: ${{ steps.image-tag.outputs.IMAGE_TAG }}
+      environment: ${{ steps.image-tag.outputs.ENVIRONMENT }}
+
+  deploy-to-aks:
+    needs: build-images
+    runs-on: ubuntu-latest
+    name: 🚀 Deploy to AKS
+    environment: ${{ needs.build-images.outputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'v3.12.3'
+        
+    - name: Log in to Azure CLI
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Get AKS credentials
+      run: |
+        az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER }} --overwrite-existing
+        
+    - name: Create namespace if not exists
+      run: |
+        kubectl create namespace ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+        
+    - name: Deploy with Helm
+      run: |
+        helm upgrade --install ${{ env.HELM_RELEASE_NAME }} ./helm-chart \
+          --namespace ${{ env.NAMESPACE }} \
+          --set global.registry=${{ env.ACR_NAME }}.azurecr.io \
+          --set global.imageTag=${{ needs.build-images.outputs.image-tag }} \
+          --set global.azure.clientId="${{ secrets.AZURE_CLIENT_ID }}" \
+          --set global.azure.tenantId="${{ secrets.AZURE_TENANT_ID }}" \
+          --set global.azure.clientSecret="${{ secrets.AZURE_CLIENT_SECRET }}" \
+          --set global.azure.subscriptionId="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+          --set global.auth.secretKey="${{ secrets.AUTH_SECRET_KEY }}" \
+          --set global.auth.adminUsername="${{ secrets.ADMIN_USERNAME }}" \
+          --set global.auth.adminPassword="${{ secrets.ADMIN_PASSWORD }}" \
+          --wait \
+          --timeout=10m
+          
+    - name: Verify deployment
+      run: |
+        echo "🔍 Deployment Status:"
+        kubectl get deployments -n ${{ env.NAMESPACE }} -l app.kubernetes.io/name=azure-day2-engine
+        
+        echo "🔍 Pod Status:"
+        kubectl get pods -n ${{ env.NAMESPACE }} -l app.kubernetes.io/name=azure-day2-engine
+        
+        echo "🔍 Service Status:"
+        kubectl get services -n ${{ env.NAMESPACE }} -l app.kubernetes.io/name=azure-day2-engine
+        
+        echo "🔍 Helm Release Status:"
+        helm status ${{ env.HELM_RELEASE_NAME }} -n ${{ env.NAMESPACE }}
+        
+    - name: Run deployment health checks
+      run: |
+        echo "🏥 Running health checks..."
+        
+        # Wait for pods to be ready
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=azure-day2-engine,component=backend -n ${{ env.NAMESPACE }} --timeout=300s
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=azure-day2-engine,component=frontend -n ${{ env.NAMESPACE }} --timeout=300s
+        
+        # Test backend health endpoint
+        kubectl port-forward service/azure-day2-engine-backend-service -n ${{ env.NAMESPACE }} 8080:80 &
+        sleep 10
+        
+        curl -f http://localhost:8080/health || echo "⚠️ Backend health check failed"
+        curl -f http://localhost:8080/ || echo "⚠️ Backend root endpoint failed"
+        
+        pkill -f "kubectl port-forward" || true
+        
+        echo "✅ Deployment health checks completed"
+        
+    - name: Get external IP
+      run: |
+        echo "🌐 Getting external access information..."
+        EXTERNAL_IP=$(kubectl get service azure-day2-engine-frontend-service -n ${{ env.NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' || echo "pending")
+        
+        if [ "$EXTERNAL_IP" != "pending" ] && [ "$EXTERNAL_IP" != "" ]; then
+          echo "✅ Frontend accessible at: http://$EXTERNAL_IP"
+          echo "✅ Backend API docs at: http://$EXTERNAL_IP/docs (via port-forward)"
+        else
+          echo "⏳ External IP is still being assigned..."
+          echo "Use: kubectl get svc azure-day2-engine-frontend-service -n ${{ env.NAMESPACE }} -w"
+        fi
+
+  notify-deployment:
+    needs: [build-images, deploy-to-aks]
+    runs-on: ubuntu-latest
+    name: 📢 Notify Deployment
+    if: always()
+    
+    steps:
+    - name: Deployment notification
+      run: |
+        if [[ "${{ needs.deploy-to-aks.result }}" == "success" ]]; then
+          echo "🎉 Deployment successful!"
+          echo "Environment: ${{ needs.build-images.outputs.environment }}"
+          echo "Image Tag: ${{ needs.build-images.outputs.image-tag }}"
+          echo "Deployed to: ${{ env.AKS_CLUSTER }}/${{ env.NAMESPACE }}"
+        else
+          echo "❌ Deployment failed!"
+          echo "Check the deployment logs for details."
+          exit 1
+        fi

@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-day2-engine-backend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azure-day2-engine.labels" . | nindent 4 }}
+    component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "azure-day2-engine.selectorLabels" . | nindent 6 }}
+      component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "azure-day2-engine.selectorLabels" . | nindent 8 }}
+        component: backend
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+      - name: backend
+        image: "{{ .Values.global.registry }}/{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default .Values.global.imageTag }}"
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.backend.service.targetPort }}
+          name: http
+        env:
+        - name: AZURE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: client-id
+        - name: AZURE_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: tenant-id
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: client-secret
+        - name: AZURE_SUBSCRIPTION_ID
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: subscription-id
+        - name: LOG_LEVEL
+          value: {{ .Values.backend.env.LOG_LEVEL | quote }}
+        - name: DEBUG
+          value: {{ .Values.backend.env.DEBUG | quote }}
+        # Authentication environment variables
+        - name: AUTH_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: auth-secret-key
+        - name: ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: admin-username
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: admin-password
+        - name: ACCESS_TOKEN_EXPIRE_MINUTES
+          value: {{ .Values.global.auth.tokenExpireMinutes | quote }}
+        resources:
+          {{- toYaml .Values.backend.resources | nindent 10 }}
+        livenessProbe:
+          {{- toYaml .Values.backend.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.backend.readinessProbe | nindent 10 }}
+        volumeMounts:
+        - name: sql-scripts
+          mountPath: /app/app/scripts/sql
+          readOnly: true
+      volumes:
+      - name: sql-scripts
+        configMap:
+          name: sql-scripts-config
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,21 @@
+apiVersion: v2
+name: azure-day2-engine
+description: Azure Day 2 Engine - Microservices deployment for AKS and PostgreSQL operations
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://github.com/aofvalley/azure-day2-engine-python
+maintainers:
+  - name: Azure Day 2 Engine Team
+    email: support@example.com
+keywords:
+  - azure
+  - aks
+  - postgresql
+  - fastapi
+  - streamlit
+  - microservices
+sources:
+  - https://github.com/aofvalley/azure-day2-engine-python
+annotations:
+  category: Infrastructure

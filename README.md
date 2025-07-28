@@ -182,11 +182,33 @@ AZURE_SUBSCRIPTION_ID=your-subscription-id
 
 ## 🆘 Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| "TypeError: Load failed" | Set environment variables, restart server |
-| "API not reachable" | Start FastAPI server on port 8000 |
-| Authentication failures | Run authentication tests in `test/` directory |
+### **Quick Diagnostic**
+```bash
+# Run interactive troubleshooting tool
+./scripts/troubleshoot-deployment.sh
+
+# Check pod status
+kubectl get pods -o wide
+
+# View logs
+kubectl logs -f -l component=backend
+```
+
+### **Common Issues**
+
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| **ImagePullBackOff** | Pods can't pull images | Images built for wrong architecture → Use troubleshoot script option 5 |
+| **CrashLoopBackOff** | Missing dependencies | Fixed in latest requirements.txt → Rebuild images |
+| **Authentication** | Azure CLI errors | Clear cache: `rm -rf ~/.azure/msal_*` → `az login` |
+| **Health Checks** | Pods not ready | Check `/health` endpoint → Review logs |
+
+### **Architecture Notes**
+- 🍎 **Mac Users**: Images auto-built for AMD64 (AKS compatibility)
+- 🐳 **Docker**: Use `--platform linux/amd64` for AKS deployment
+- ☁️ **AKS**: Nodes run AMD64, ensure image compatibility
+
+**📋 Full troubleshooting guide**: See `TROUBLESHOOTING.md`
 
 ---
 

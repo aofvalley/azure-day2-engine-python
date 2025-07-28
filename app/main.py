@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import structlog
 from app.api.v1.aks import router as aks_router
 from app.api.v1.pssql import router as pssql_router
+from app.api.v1.auth import router as auth_router
 from app.core.config import settings
 
 logger = structlog.get_logger(__name__)
@@ -23,6 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(aks_router, prefix="/AKS/v1", tags=["AKS Operations"])
 app.include_router(pssql_router, prefix="/PSSQL/v1", tags=["PostgreSQL Operations"])
 

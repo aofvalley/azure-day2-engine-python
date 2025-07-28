@@ -1,0 +1,201 @@
+# Azure Day 2 Engine - Helm Values
+# ================================
+
+# Global configuration
+global:
+  # Container registry configuration
+  registry: "advaks.azurecr.io"
+  imageTag: "latest"
+  
+  # Azure configuration
+  azure:
+    clientId: "placeholder-client-id"
+    tenantId: "placeholder-tenant-id"
+    clientSecret: "placeholder-client-secret"
+    subscriptionId: "placeholder-subscription-id"
+  
+  # Authentication configuration
+  auth:
+    secretKey: "placeholder-secret-key"
+    adminUsername: "admin"
+    adminPassword: "placeholder-password"
+    tokenExpireMinutes: 1440
+
+# Backend configuration
+backend:
+  # Deployment settings
+  replicaCount: 1  # Changed from 2 to 1 as requested
+  
+  image:
+    repository: azure-day2-engine-backend
+    tag: ""  # Uses global.imageTag if empty
+    pullPolicy: Always
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+  
+  # Resource limits
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  # Environment variables
+  env:
+    LOG_LEVEL: "INFO"
+    DEBUG: "false"
+
+# Frontend configuration
+frontend:
+  # Deployment settings
+  replicaCount: 1
+  
+  image:
+    repository: azure-day2-engine-frontend
+    tag: ""  # Uses global.imageTag if empty
+    pullPolicy: Always
+  
+  # Service configuration
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 8501
+  
+  # Resource limits
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 8501
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 8501
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  # Environment variables
+  env:
+    API_URL: "http://azure-day2-engine-backend-service"
+
+# Service Account
+serviceAccount:
+  create: true
+  name: "azure-day2-engine"
+
+# ConfigMap for SQL scripts
+sqlScripts:
+  enabled: true
+  scripts:
+    sample_health_check.sql: |
+      -- Database Health Check Script
+      -- =============================
+      
+      -- Check PostgreSQL version and current time
+      SELECT 
+          version() as postgresql_version,
+          current_timestamp as current_time,
+          current_database() as database_name;
+      
+      -- Check database size
+      SELECT 
+          pg_size_pretty(pg_database_size(current_database())) as database_size;
+      
+      -- Check active connections
+      SELECT 
+          count(*) as active_connections
+      FROM pg_stat_activity 
+      WHERE state = 'active';
+      
+      -- Check table statistics
+      SELECT 
+          schemaname,
+          tablename,
+          n_tup_ins as inserts,
+          n_tup_upd as updates,
+          n_tup_del as deletes,
+          n_live_tup as live_tuples,
+          n_dead_tup as dead_tuples
+      FROM pg_stat_user_tables
+      ORDER BY n_live_tup DESC
+      LIMIT 10;
+    
+    sample_backup_check.sql: |
+      -- Backup Check Script
+      -- ===================
+      
+      -- Check last backup time (if available)
+      SELECT 
+          name as backup_name,
+          backup_start_date,
+          backup_finish_date,
+          type as backup_type,
+          server_version
+      FROM pg_stat_archiver
+      LIMIT 5;
+      
+      -- Check WAL status
+      SELECT 
+          pg_current_wal_lsn() as current_wal_lsn,
+          pg_is_in_recovery() as is_in_recovery;
+
+# Labels applied to all resources
+commonLabels:
+  app: azure-day2-engine
+  version: "1.0.0"
+  managed-by: helm
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Node selector (optional)
+nodeSelector: {}
+
+# Tolerations (optional)
+tolerations: []
+
+# Affinity rules (optional)
+affinity: {}

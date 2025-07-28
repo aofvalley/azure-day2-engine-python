@@ -1,0 +1,14 @@
+{{- if .Values.sqlScripts.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sql-scripts-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "azure-day2-engine.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.sqlScripts.scripts }}
+  {{ $key }}: |
+{{ $value | indent 4 }}
+  {{- end }}
+{{- end }}
