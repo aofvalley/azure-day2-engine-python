@@ -24,7 +24,7 @@ def get_postgresql_service():
     return PostgreSQLService()
 
 @router.post("/upgrade", response_model=PostgreSQLResponse)
-async def major_upgrade(request: PostgreSQLMajorUpgradeRequest):
+async def major_upgrade(request: PostgreSQLMajorUpgradeRequest, current_user: dict = Depends(get_current_user)):
     """Perform major upgrade on PostgreSQL Flexible Server"""
     try:
         logger.info(f"Received request to upgrade PostgreSQL server: {request.server_name} to version {request.target_version}")
@@ -59,7 +59,7 @@ async def major_upgrade(request: PostgreSQLMajorUpgradeRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.get("/status/{resource_group}/{server_name}", response_model=PostgreSQLResponse)
-async def get_server_status(resource_group: str, server_name: str):
+async def get_server_status(resource_group: str, server_name: str, current_user: dict = Depends(get_current_user)):
     """Get PostgreSQL Flexible Server status"""
     try:
         logger.info(f"Received request to get status for PostgreSQL server: {server_name}")
@@ -93,7 +93,7 @@ async def get_server_status(resource_group: str, server_name: str):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/execute-script", response_model=ScriptExecutionResponse)
-async def execute_custom_script(request: PostgreSQLCustomScriptRequest):
+async def execute_custom_script(request: PostgreSQLCustomScriptRequest, current_user: dict = Depends(get_current_user)):
     """Execute custom SQL script on PostgreSQL Flexible Server"""
     try:
         logger.info(f"Received request to execute script {request.script_name} on database {request.database_name}")
@@ -133,7 +133,7 @@ async def execute_custom_script(request: PostgreSQLCustomScriptRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/cli", response_model=CLICommandResponse)
-async def execute_cli_command(request: CLICommandRequest):
+async def execute_cli_command(request: CLICommandRequest, current_user: dict = Depends(get_current_user)):
     """Execute Azure CLI command for PostgreSQL operations"""
     try:
         logger.info(f"Received request to execute Azure CLI command: {request.command}")
@@ -163,7 +163,7 @@ async def execute_cli_command(request: CLICommandRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/servers/list", response_model=PostgreSQLServerListResponse)
-async def list_servers(request: PostgreSQLListServersRequest):
+async def list_servers(request: PostgreSQLListServersRequest, current_user: dict = Depends(get_current_user)):
     """List PostgreSQL Flexible Servers in subscription or resource group"""
     try:
         logger.info(f"Received request to list PostgreSQL servers in {'resource group ' + request.resource_group if request.resource_group else 'subscription'}")
@@ -193,7 +193,7 @@ async def list_servers(request: PostgreSQLListServersRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/servers/start", response_model=PostgreSQLResponse)
-async def start_server(request: PostgreSQLServerRequest):
+async def start_server(request: PostgreSQLServerRequest, current_user: dict = Depends(get_current_user)):
     """Start PostgreSQL Flexible Server"""
     try:
         logger.info(f"Received request to start PostgreSQL server: {request.server_name}")
@@ -227,7 +227,7 @@ async def start_server(request: PostgreSQLServerRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/servers/stop", response_model=PostgreSQLResponse)
-async def stop_server(request: PostgreSQLServerRequest):
+async def stop_server(request: PostgreSQLServerRequest, current_user: dict = Depends(get_current_user)):
     """Stop PostgreSQL Flexible Server"""
     try:
         logger.info(f"Received request to stop PostgreSQL server: {request.server_name}")

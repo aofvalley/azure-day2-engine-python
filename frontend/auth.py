@@ -1,47 +1,59 @@
 """
-Authentication module for Frontend
-==================================
+Authentication module for Azure Day 2 Engine Frontend
+==================================================
 
-Handles user authentication in the Streamlit frontend.
+Simple authentication system for securing the frontend dashboard.
+Uses session state to maintain authentication across page interactions.
 """
 
 import streamlit as st
-import requests
-import json
-from datetime import datetime, timedelta
+import hashlib
+import os
+import time
 from typing import Optional, Dict, Any
 
+# Configuration
+AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
+AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "azure-day2-engine-2025")  # Default password
+API_BASE_URL = os.getenv("API_URL", "http://localhost:8000")
+
 def get_api_base_url() -> str:
-    """Get the API base URL from session state or default"""
-    return st.session_state.get("api_base_url", "http://localhost:8000")
+    """Get the API base URL"""
+    return API_BASE_URL
+
+def hash_password(password: str) -> str:
+    """Hash password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_credentials(username: str, password: str) -> bool:
+    """Verify user credentials"""
+    expected_username = AUTH_USERNAME
+    expected_password_hash = hash_password(AUTH_PASSWORD)
+    provided_password_hash = hash_password(password)
+    
+    return (username == expected_username and 
+            provided_password_hash == expected_password_hash)
 
 def login_user(username: str, password: str) -> Dict[str, Any]:
     """
-    Authenticate user with the backend API
+    Authenticate user with simple credential check
     
     Returns:
         Dict with login response or error information
     """
-    api_url = get_api_base_url()
-    login_url = f"{api_url}/auth/login"
-    
-    try:
-        response = requests.post(
-            login_url,
-            json={"username": username, "password": password},
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            return {"success": True, "data": response.json()}
-        else:
-            error_detail = response.json().get("detail", "Login failed")
-            return {"success": False, "error": error_detail}
-            
-    except requests.exceptions.RequestException as e:
-        return {"success": False, "error": f"Connection error: {str(e)}"}
-    except json.JSONDecodeError:
-        return {"success": False, "error": "Invalid response from server"}
+    if verify_credentials(username, password):
+        # Generate a demo token for the session
+        token = f"demo_token_{int(time.time())}_{username}"
+        return {
+            "success": True, 
+            "data": {
+                "access_token": token,
+                "user_info": {"username": username, "role": "admin"},
+                "expires_in": 7200  # 2 hours
+            }
+        }
+    else:
+        return {"success": False, "error": "Invalid credentials"}
 
 def logout_user():
     """Logout user and clear session"""
@@ -50,16 +62,6 @@ def logout_user():
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
-    
-    # Try to call logout endpoint if we have a token
-    if "access_token" in st.session_state:
-        try:
-            api_url = get_api_base_url()
-            logout_url = f"{api_url}/auth/logout"
-            headers = {"Authorization": f"Bearer {st.session_state.access_token}"}
-            requests.post(logout_url, headers=headers, timeout=5)
-        except:
-            pass  # Ignore logout API errors
     
     st.success("Logged out successfully")
     st.rerun()
@@ -164,11 +166,11 @@ def show_login_form():
         # Information section
         st.markdown("---")
         st.markdown("### 📋 Default Credentials")
-        st.info("""
-            **Username:** admin  
-            **Password:** azure-day2-admin
+        st.info(f"""
+            **Username:** {AUTH_USERNAME}  
+            **Password:** {AUTH_PASSWORD}
             
-            ⚠️ **Security Note:** Change these credentials in production!
+            ⚠️ **Security Note:** Configure via environment variables in production!
         """)
         
         # API connection status
@@ -176,6 +178,7 @@ def show_login_form():
         api_url = get_api_base_url()
         
         try:
+            import requests
             response = requests.get(f"{api_url}/health", timeout=5)
             if response.status_code == 200:
                 st.success(f"✅ Connected to API: {api_url}")
@@ -184,6 +187,8 @@ def show_login_form():
         except requests.exceptions.RequestException as e:
             st.error(f"❌ Connection failed: {str(e)}")
             st.warning("Make sure the backend API is running and accessible")
+        except ImportError:
+            st.warning("⚠️ Requests library not available for connection test")
 
 def show_user_info():
     """Display current user information in sidebar"""

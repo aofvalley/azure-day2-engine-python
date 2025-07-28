@@ -33,6 +33,17 @@ spec:
         env:
         - name: API_URL
           value: {{ .Values.frontend.env.API_URL | quote }}
+        # Authentication environment variables
+        - name: AUTH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: admin-username
+        - name: AUTH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: auth-credentials
+              key: admin-password
         resources:
           {{- toYaml .Values.frontend.resources | nindent 10 }}
         livenessProbe:
