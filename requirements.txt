@@ -3,8 +3,11 @@ uvicorn[standard]==0.24.0
 azure-identity>=1.13.0
 azure-cli-core>=2.30.0
 azure-cli>=2.30.0
+azure-mgmt-containerservice>=29.0.0
+azure-mgmt-rdbms>=10.1.0
 psycopg2-binary==2.9.9
 pydantic>=2.9.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0
 python-multipart==0.0.6
 httpx>=0.28.1,<1.0.0
 asyncio==3.4.3

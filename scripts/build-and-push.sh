@@ -2,6 +2,10 @@
 
 # Azure Day 2 Engine - Build and Push Docker Images to ACR
 # ========================================================
+# Updated: Fixed ImagePullBackOff issues by:
+# - Building for AMD64 architecture (AKS node compatibility)
+# - Enhanced error handling for Azure CLI authentication
+# - Automatic Docker buildx setup
 
 set -e
 
@@ -44,6 +48,12 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
+# Enable Docker buildx for multi-platform builds
+if ! docker buildx version >/dev/null 2>&1; then
+    print_warning "Docker buildx not available, enabling..."
+    docker buildx create --use --name multiarch --driver docker-container
+fi
+
 # Check if Azure CLI is installed and logged in
 if ! command -v az &> /dev/null; then
     print_error "Azure CLI is not installed"
@@ -58,25 +68,55 @@ fi
 
 print_status "Prerequisites verified"
 
-# Login to ACR
+# Login to ACR with error handling
 echo -e "${BLUE}🔐 Logging in to Azure Container Registry...${NC}"
-az acr login --name "$ACR_NAME"
+
+# Try ACR login with error handling for known Azure CLI issues
+if ! az acr login --name "$ACR_NAME" 2>/dev/null; then
+    print_warning "ACR login failed. This might be due to Azure CLI cache issues."
+    echo -e "${YELLOW}Attempting to fix Azure CLI cache...${NC}"
+    
+    # Clear Azure CLI cache
+    print_warning "Clearing Azure CLI cache..."
+    rm -rf ~/.azure/msal_http_cache
+    rm -rf ~/.azure/msal_token_cache.bin
+    
+    # Try login again
+    echo -e "${BLUE}Retrying ACR login...${NC}"
+    if ! az acr login --name "$ACR_NAME"; then
+        print_error "ACR login failed even after clearing cache."
+        echo ""
+        echo "Possible solutions:"
+        echo "1. Clear all Azure CLI cache: rm -rf ~/.azure && az login"
+        echo "2. Downgrade Azure CLI: brew uninstall azure-cli && brew install azure-cli@2.70.0"
+        echo "3. Use Docker login directly: docker login $ACR_NAME.azurecr.io"
+        echo ""
+        echo "If using Docker login, you'll need to get ACR credentials manually:"
+        echo "az acr credential show --name $ACR_NAME"
+        exit 1
+    fi
+fi
+
 print_status "Logged in to ACR: $ACR_NAME"
 
-# Build backend image
-echo -e "${BLUE}🏗️  Building backend Docker image...${NC}"
-docker build \
+# Build backend image for AMD64 (AKS nodes architecture)
+echo -e "${BLUE}🏗️  Building backend Docker image for AMD64...${NC}"
+docker buildx build \
+    --platform linux/amd64 \
     -f docker/backend.Dockerfile \
     -t "$ACR_NAME.azurecr.io/$PROJECT_NAME-backend:$IMAGE_TAG" \
+    --load \
     .
 
 print_status "Backend image built: $ACR_NAME.azurecr.io/$PROJECT_NAME-backend:$IMAGE_TAG"
 
-# Build frontend image
-echo -e "${BLUE}🎨 Building frontend Docker image...${NC}"
-docker build \
+# Build frontend image for AMD64 (AKS nodes architecture)
+echo -e "${BLUE}🎨 Building frontend Docker image for AMD64...${NC}"
+docker buildx build \
+    --platform linux/amd64 \
     -f docker/frontend.Dockerfile \
     -t "$ACR_NAME.azurecr.io/$PROJECT_NAME-frontend:$IMAGE_TAG" \
+    --load \
     .
 
 print_status "Frontend image built: $ACR_NAME.azurecr.io/$PROJECT_NAME-frontend:$IMAGE_TAG"
