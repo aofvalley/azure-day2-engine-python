@@ -1,4 +1,4 @@
-# 🔐 Azure Day 2 Engine - Secure Edition
+# 🔐 Azure Day 2 Engine
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
